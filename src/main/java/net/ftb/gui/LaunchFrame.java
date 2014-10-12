@@ -416,7 +416,7 @@ public class LaunchFrame extends JFrame {
     /**
      * call this to login
      */
-    private void doLogin (final String username, String password, String mojangData, String selectedProfile) {
+    private void doLogin (final String username, String password, String mojangData) {
         if (ModPack.getSelectedPack().getDisclaimer() != null && !ModPack.getSelectedPack().getDisclaimer().isEmpty()) {
             ErrorUtils.tossError(ModPack.getSelectedPack().getDisclaimer());
         }
@@ -450,7 +450,7 @@ public class LaunchFrame extends JFrame {
         tpInstall.setEnabled(false);
         tpInstallLocation.setEnabled(false);
 
-        LoginWorker loginWorker = new LoginWorker(username, password, mojangData, selectedProfile) {
+        LoginWorker loginWorker = new LoginWorker(username, password, mojangData) {
             @Override
             public void done () {
                 String responseStr;
