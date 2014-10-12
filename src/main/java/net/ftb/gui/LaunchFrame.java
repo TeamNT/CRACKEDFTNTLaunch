@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file is part of FTB Launcher.
  *
  * Copyright © 2012-2014, FTB Launcher Contributors <https://github.com/Slowpoke101/FTBLaunch/>
