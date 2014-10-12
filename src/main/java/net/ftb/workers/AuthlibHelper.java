@@ -53,7 +53,7 @@ import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
 public class AuthlibHelper {
     private static String uniqueID;
 
-    protected static LoginResponse authenticateWithAuthlib (String user, String pass, String mojangData, String selectedProfileName) {
+    protected static LoginResponse authenticateWithAuthlib (String user, String pass, String mojangData) {
         String displayName;
         boolean hasMojangData = false;
         boolean hasPassword = false;
