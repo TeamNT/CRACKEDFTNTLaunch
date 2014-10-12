@@ -29,11 +29,11 @@ import net.ftb.util.ErrorUtils;
  * SwingWorker that logs into minecraft.net. Returns a string containing the response received from the server.
  */
 public class LoginWorker extends SwingWorker<String, Void> {
-    private String username, password, mojangData, selectedProfile;
+    private String username, password, mojangData;
     @Getter
     LoginResponse resp;
 
-    public LoginWorker(String username, String password, String mojangData, String selectedProfile) {
+    public LoginWorker(String username, String password, String mojangData) {
         super();
         this.username = username;
         this.password = password;
@@ -47,7 +47,7 @@ public class LoginWorker extends SwingWorker<String, Void> {
         try {
             if (LaunchFrame.canUseAuthlib) {
                 try {
-                    LoginResponse resp = AuthlibHelper.authenticateWithAuthlib(username, password, mojangData, selectedProfile);
+                    LoginResponse resp = AuthlibHelper.authenticateWithAuthlib(username, password, mojangData);
                     this.resp = resp;
                     Benchmark.logBenchAs("LoginWorker", "Login Worker Run");
                     if (resp != null && resp.getUsername() != null && !resp.getUsername().isEmpty()) {
