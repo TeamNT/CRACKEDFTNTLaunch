@@ -81,7 +81,6 @@ public class LaunchFrame extends JFrame {
     private JPanel footer = new JPanel();
     private JLabel footerLogo = new JLabel(new ImageIcon(this.getClass().getResource(Locations.FTBLOGO)));
     private JLabel footerCreeper = new JLabel(new ImageIcon(this.getClass().getResource(Locations.CHLOGO)));
-    private JLabel footerTUG = new JLabel(new ImageIcon(this.getClass().getResource(Locations.TUGLOGO)));
     private JLabel tpInstallLocLbl = new JLabel();
     @Getter
     private final JButton launch = new JButton(), edit = new JButton(), donate = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
@@ -170,15 +169,6 @@ public class LaunchFrame extends JFrame {
             @Override
             public void mouseClicked (MouseEvent event) {
                 OSUtils.browse("http://billing.creeperhost.net/link.php?id=2");
-            }
-        });
-
-        footerTUG.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerTUG.setBounds(212, 20, 132, 42);
-        footerTUG.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked (MouseEvent event) {
-                OSUtils.browse("http://feed-the-beast.com/tug");
             }
         });
 
@@ -294,8 +284,8 @@ public class LaunchFrame extends JFrame {
             @Override
             public void actionPerformed (ActionEvent event) {
                 if (mapsPane.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
-                    OSUtils.browse(DownloadUtils.getCreeperhostLink("maps/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getMapName() + "/"
-                            + Map.getMap(LaunchFrame.getSelectedMapIndex()).getVersion() + "/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getUrl()));
+                    OSUtils.browse(DownloadUtils.getCreeperhostLink("maps%5E" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getMapName() + "%5E"
+                            + Map.getMap(LaunchFrame.getSelectedMapIndex()).getVersion() + "%5E" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getUrl()));
                 }
             }
         });
@@ -326,7 +316,6 @@ public class LaunchFrame extends JFrame {
         footer.add(users);
         footer.add(footerLogo);
         footer.add(footerCreeper);
-        footer.add(footerTUG);
         footer.add(launch);
         footer.add(donate);
         footer.add(serverbutton);
@@ -461,7 +450,7 @@ public class LaunchFrame extends JFrame {
         tpInstall.setEnabled(false);
         tpInstallLocation.setEnabled(false);
 
-        LoginWorker loginWorker = new LoginWorker(username, password, mojangData) {
+        LoginWorker loginWorker = new LoginWorker(username, password, mojangData, selectedProfile) {
             @Override
             public void done () {
                 String responseStr;
