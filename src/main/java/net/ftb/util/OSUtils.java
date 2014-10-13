@@ -87,11 +87,11 @@ public class OSUtils {
         }
         switch (getCurrentOS()) {
         case WINDOWS:
-            return System.getenv("APPDATA") + "/ftblauncher/";
+            return System.getenv("APPDATA") + "/ftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftblauncher/";
+            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftblauncher/";
+            return cachedUserHome + "/.ftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -110,13 +110,13 @@ public class OSUtils {
         switch (getCurrentOS()) {
         case WINDOWS:
             if (System.getenv("LOCALAPPDATA") != null && System.getenv("LOCALAPPDATA").length() > 5)
-                return System.getenv("LOCALAPPDATA") + "/ftblauncher/";
+                return System.getenv("LOCALAPPDATA") + "/ftntlauncher/";
             else
-                return System.getenv("APPDATA") + "/ftblauncher/";
+                return System.getenv("APPDATA") + "/ftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftblauncher/";
+            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftblauncher/";
+            return cachedUserHome + "/.ftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -390,8 +390,7 @@ public class OSUtils {
     }
     private static byte[] genHardwareIDUNIX () {
         String line;
-        // TODO: will add command line option or advanced option later. Use old mac address method
-        if (false) {
+        if (CommandLineSettings.getSettings().isUseMac()) {
             try {
                 BufferedReader reader = new BufferedReader(new FileReader("/etc/machine-id"));
                 line = reader.readLine();
