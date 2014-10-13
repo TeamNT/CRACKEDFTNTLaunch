@@ -85,7 +85,7 @@ public class UpdateChecker extends SwingWorker<Boolean, Void> {
 
     private void loadInfo () {
         try {
-            Document doc = AppUtils.downloadXML(new URL(DownloadUtils.getStaticCreeperhostLink("version.xml")));
+            Document doc = AppUtils.downloadXML(new URL(DownloadUtils.getStaticCreeperhostLink("CRACKEDversion.xml")));
             Update upd = JsonFactory.getUpdate("net.ftb:launcher:beta@json", Locations.FTBMAVENFULL);
             if (upd.getPrimary().equals("beta")){
                 Channel beta = upd.getBeta();
