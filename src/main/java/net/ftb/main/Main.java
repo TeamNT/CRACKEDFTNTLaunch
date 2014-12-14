@@ -43,7 +43,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 public class Main {
@@ -132,18 +131,6 @@ public class Main {
         URL mf = LaunchFrame.class.getResource("/buildproperties.properties");
         beta = 9999999;
         String mfStr = "";
-        try {
-            Properties props = new Properties();
-            props.load(mf.openStream());
-            mfStr = props.getProperty("LauncherJenkins");
-            if (!mfStr.equals("${LauncherJenkins}"))
-                beta = Integer.parseInt(mfStr);
-            Logger.logDebug("FTB Launcher CI Build #: " + beta + ", Git SHA: " + props.getProperty("Git-SHA"));
-        } catch (Exception e) {
-            Logger.logError("Error getting beta information, assuming beta channel not usable!", e);
-            beta = 9999999;
-        }
-
         /*
          *  Posts information about OS, JVM and launcher version into Google Analytics
          */

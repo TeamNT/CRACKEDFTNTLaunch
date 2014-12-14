@@ -28,7 +28,6 @@ import java.util.Map.Entry;
 
 import com.google.common.collect.Lists;
 import net.feed_the_beast.launcher.json.JsonFactory;
-import net.feed_the_beast.launcher.json.OldPropertyMapSerializer;
 import net.feed_the_beast.launcher.json.assets.AssetIndex;
 import net.feed_the_beast.launcher.json.assets.AssetIndex.Asset;
 import net.ftb.data.ModPack;
@@ -37,14 +36,9 @@ import net.ftb.download.Locations;
 import net.ftb.log.Logger;
 import net.ftb.util.*;
 
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
-import com.mojang.authlib.UserAuthentication;
 import com.mojang.authlib.UserType;
-import com.mojang.authlib.properties.PropertyMap;
-import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
-import com.mojang.util.UUIDTypeAdapter;
 
 import javax.swing.*;
 
@@ -54,9 +48,9 @@ public class MCLauncher {
     private static String gameDirectory;
     private static StringBuilder cpb;
 
-    public static Process launchMinecraft(String javaPath, String gameFolder, File assetDir, File nativesDir, List<File> classpath, String mainClass, String args, String assetIndex, String rmax,
-                                          String maxPermSize, String version, UserAuthentication authentication, boolean legacy) throws IOException {
-
+    public static Process launchMinecraft(String javaPath, String gameFolder, File assetDir, File nativesDir, List<File> classpath, String mainClass, String args, String assetIndex, String rmax, String maxPermSize, String version, boolean legacy, String user)
+    	    throws IOException
+    	  {
         cpb = new StringBuilder("");
         isLegacy = legacy;
         gameDirectory = gameFolder;
@@ -149,60 +143,31 @@ public class MCLauncher {
 
         arguments.add(mainClass);
         for (String s : args.split(" ")) {
-            boolean done = false;
-            if (authentication.getSelectedProfile() != null) {
-                if (s.equals("${auth_player_name}")) {
-                    arguments.add(authentication.getSelectedProfile().getName());
-                    done = true;
-                } else if (s.equals("${auth_uuid}")) {
-                    arguments.add(UUIDTypeAdapter.fromUUID(authentication.getSelectedProfile().getId()));
-                    done = true;
-                } else if (s.equals("${user_type}")) {
-                    arguments.add(authentication.getUserType().getName());
-                    done = true;
-                }
-            } else {
-                if (s.equals("${auth_player_name}")) {
-                    arguments.add("Player");
-                    done = true;
-                } else if (s.equals("${auth_uuid}")) {
-                    arguments.add(new UUID(0L, 0L).toString());
-                    done = true;
-                } else if (s.equals("${user_type}")) {
-                    arguments.add(UserType.LEGACY.getName());
-                    done = true;
-                }
-            }
-            if (!done) {
-                if (s.equals("${auth_session}")) {
-                    if (authentication.isLoggedIn() && authentication.canPlayOnline()) {
-                        if (authentication instanceof YggdrasilUserAuthentication && !isLegacy) {
-                            arguments.add(String.format("token:%s:%s", authentication.getAuthenticatedToken(), UUIDTypeAdapter.fromUUID(authentication.getSelectedProfile().getId())));
-                        } else {
-                            arguments.add(authentication.getAuthenticatedToken());
-                        }
-                    } else {
-                        arguments.add("-");
-                    }
-                } else if (s.equals("${auth_access_token}"))
-                    arguments.add(authentication.getAuthenticatedToken());
-                else if (s.equals("${version_name}"))
-                    arguments.add(version);
-                else if (s.equals("${game_directory}"))
-                    arguments.add(gameDir.getAbsolutePath());
-                else if (s.equals("${game_assets}") || s.equals("${assets_root}"))
-                    arguments.add(assetDir.getAbsolutePath());
-                else if (s.equals("${assets_index_name}"))
-                    arguments.add(assetIndex == null ? "legacy" : assetIndex);
-                else if (s.equals("${user_properties}"))
-                    arguments.add(new GsonBuilder().registerTypeAdapter(PropertyMap.class, new OldPropertyMapSerializer()).create().toJson(authentication.getUserProperties()));
-                else if (s.equals("${user_properties_map}"))
-                    arguments.add(new GsonBuilder().registerTypeAdapter(PropertyMap.class, new PropertyMap.Serializer()).create().toJson(authentication.getUserProperties()));
-                else if (isLegacy)
-                    arguments.add(parseLegacyArgs(s));
-                else
-                    arguments.add(s);
-            }
+          if (s.equals("${auth_player_name}")) {
+            arguments.add(user);
+          } else if (s.equals("${auth_uuid}")) {
+            arguments.add(new UUID(0L, 0L).toString());
+          } else if (s.equals("${user_type}")) {
+            arguments.add(UserType.LEGACY.getName());
+          } else if (s.equals("${user_properties}")) {
+            arguments.add("{}");
+          } else if (s.equals("${auth_session}")) {
+            arguments.add("-");
+          } else if (s.equals("${auth_access_token}")) {
+            arguments.add("f5aaf72f76684c5fb88a07d4f2221fba");
+          } else if (s.equals("${version_name}")) {
+            arguments.add(version);
+          } else if (s.equals("${game_directory}")) {
+            arguments.add(gameDir.getAbsolutePath());
+          } else if ((s.equals("${game_assets}")) || (s.equals("${assets_root}"))) {
+            arguments.add(assetDir.getAbsolutePath());
+          } else if (s.equals("${assets_index_name}")) {
+            arguments.add(assetIndex == null ? "legacy" : assetIndex);
+          } else if (isLegacy) {
+            arguments.add(parseLegacyArgs(s));
+          } else {
+            arguments.add(s);
+          }
         }
         if(!isLegacy) {//legacy is handled separately
             boolean fullscreen = false;

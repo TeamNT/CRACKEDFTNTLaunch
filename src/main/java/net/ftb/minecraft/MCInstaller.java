@@ -22,7 +22,6 @@ import net.feed_the_beast.launcher.json.assets.AssetIndex;
 import net.feed_the_beast.launcher.json.versions.Library;
 import net.feed_the_beast.launcher.json.versions.Version;
 import net.ftb.data.LauncherStyle;
-import net.ftb.data.LoginResponse;
 import net.ftb.data.ModPack;
 import net.ftb.data.Settings;
 import net.ftb.download.Locations;
@@ -56,7 +55,7 @@ import java.util.zip.ZipInputStream;
 public class MCInstaller {
     private static String packmcversion = new String();
     private static String packbasejson = new String();
-    public static void setupNewStyle (final String installPath, final ModPack pack, final boolean isLegacy, final LoginResponse RESPONSE) {
+    public static void setupNewStyle (final String installPath, final ModPack pack, final boolean isLegacy, final String user) {
         packmcversion = pack.getMcVersion(Settings.getSettings().getPackVer(pack.getDir()));
         List<DownloadInfo> assets = gatherAssets(new File(installPath),installPath);
         if (assets != null && assets.size() > 0) {
@@ -72,7 +71,7 @@ public class MCInstaller {
                         prog.close();
                         if (get()) {
                             Logger.logInfo("Asset downloading complete");
-                            launchMinecraft(installPath, pack, RESPONSE, isLegacy);
+                            launchMinecraft(installPath, pack, user, isLegacy);
                         } else {
                             ErrorUtils.tossError("Error occurred during downloading the assets");
                         }
@@ -105,7 +104,7 @@ public class MCInstaller {
         } else if (assets == null) {
             Main.getEventBus().post(new EnableObjectsEvent());
         } else {
-            launchMinecraft(installPath, pack, RESPONSE, isLegacy);
+            launchMinecraft(installPath, pack, user, isLegacy);
         }
     }
 
@@ -293,7 +292,7 @@ public class MCInstaller {
         return null;
     }
 
-    public static void launchMinecraft(String installDir, ModPack pack, LoginResponse resp, boolean isLegacy) {
+    public static void launchMinecraft(String installDir, ModPack pack, String user, boolean isLegacy) {
         try {
             File packDir = new File(installDir, pack.getDir());
             String gameFolder = installDir + File.separator + pack.getDir() + File.separator + "minecraft";
@@ -376,7 +375,7 @@ public class MCInstaller {
 
             Process minecraftProcess = MCLauncher.launchMinecraft(Settings.getSettings().getJavaPath(), gameFolder, assetDir, natDir, classpath,
                     packjson.mainClass != null ? packjson.mainClass : base.mainClass, packjson.minecraftArguments != null ? packjson.minecraftArguments : base.minecraftArguments,
-                    packjson.assets != null ? packjson.assets : base.getAssets(), Settings.getSettings().getRamMax(), pack.getMaxPermSize(), pack.getMcVersion(packVer), resp.getAuth(), isLegacy);
+                    packjson.assets != null ? packjson.assets : base.getAssets(), Settings.getSettings().getRamMax(), pack.getMaxPermSize(), pack.getMcVersion(packVer), isLegacy, user);
             LaunchFrame.MCRunning = true;
             if (LaunchFrame.con != null)
                 LaunchFrame.con.minecraftStarted();

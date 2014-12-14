@@ -1,7 +1,7 @@
 /*
  * This file is part of FTB Launcher.
  *
- * Copyright Â© 2012-2014, FTB Launcher Contributors <https://github.com/Slowpoke101/FTBLaunch/>
+ * Copyright © 2012-2014, FTB Launcher Contributors <https://github.com/Slowpoke101/FTBLaunch/>
  * FTB Launcher is licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -53,8 +53,6 @@ import net.ftb.download.Locations;
 import net.ftb.events.EnableObjectsEvent;
 import net.ftb.gui.dialogs.LoadingDialog;
 import net.ftb.gui.dialogs.ModPackVersionChangeDialog;
-import net.ftb.gui.dialogs.PasswordDialog;
-import net.ftb.gui.dialogs.PlayOfflineDialog;
 import net.ftb.gui.dialogs.ProfileAdderDialog;
 import net.ftb.gui.dialogs.ProfileEditorDialog;
 import net.ftb.gui.panes.*;
@@ -70,7 +68,6 @@ import net.ftb.tools.TextureManager;
 import net.ftb.util.*;
 import net.ftb.util.OSUtils.OS;
 import net.ftb.util.winreg.JavaInfo;
-import net.ftb.workers.LoginWorker;
 import net.ftb.workers.UnreadNewsWorker;
 
 @SuppressWarnings("serial")
@@ -81,6 +78,7 @@ public class LaunchFrame extends JFrame {
     private JPanel footer = new JPanel();
     private JLabel footerLogo = new JLabel(new ImageIcon(this.getClass().getResource(Locations.FTBLOGO)));
     private JLabel footerCreeper = new JLabel(new ImageIcon(this.getClass().getResource(Locations.CHLOGO)));
+    private JLabel footerTUG = new JLabel(new ImageIcon(this.getClass().getResource(Locations.TUGLOGO)));
     private JLabel tpInstallLocLbl = new JLabel();
     @Getter
     private final JButton launch = new JButton(), edit = new JButton(), donate = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
@@ -163,7 +161,7 @@ public class LaunchFrame extends JFrame {
             }
         });
 
-        footerCreeper.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        /*footerCreeper.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         footerCreeper.setBounds(72, 20, 132, 42);
         footerCreeper.addMouseListener(new MouseAdapter() {
             @Override
@@ -171,6 +169,15 @@ public class LaunchFrame extends JFrame {
                 OSUtils.browse("http://billing.creeperhost.net/link.php?id=2");
             }
         });
+
+        footerTUG.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        footerTUG.setBounds(212, 20, 132, 42);
+        footerTUG.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked (MouseEvent event) {
+                OSUtils.browse("http://feed-the-beast.com/tug");
+            }
+        });*/
 
         dropdown_[0] = I18N.getLocaleString("PROFILE_SELECT");
         dropdown_[1] = I18N.getLocaleString("PROFILE_CREATE");
@@ -316,6 +323,7 @@ public class LaunchFrame extends JFrame {
         footer.add(users);
         footer.add(footerLogo);
         footer.add(footerCreeper);
+        footer.add(footerTUG);
         footer.add(launch);
         footer.add(donate);
         footer.add(serverbutton);
@@ -421,13 +429,7 @@ public class LaunchFrame extends JFrame {
             ErrorUtils.tossError(ModPack.getSelectedPack().getDisclaimer());
         }
         if ((mojangData == null || mojangData.isEmpty()) && password.isEmpty()) {
-            PasswordDialog p = new PasswordDialog(this, true);
-            p.setVisible(true);
-            if (tempPass.isEmpty()) {
-                enableObjects();
-                return;
-            }
-            password = tempPass;
+            password = "password";
         }
 
         Logger.logInfo("Logging in...");
@@ -450,53 +452,8 @@ public class LaunchFrame extends JFrame {
         tpInstall.setEnabled(false);
         tpInstallLocation.setEnabled(false);
 
-        LoginWorker loginWorker = new LoginWorker(username, password, mojangData) {
-            @Override
-            public void done () {
-                String responseStr;
-                try {
-                    responseStr = get();
-                } catch (InterruptedException err) {
-                    Logger.logError("User cancelled login process", err);
-                    enableObjects();
-                    return;
-                } catch (ExecutionException err) {
-                    // Worker should not leak ExecutionExceptions to caller: all Exceptions are handled internally twice
-                    if (err.getCause() instanceof IOException) {
-                        Logger.logError("Error while logging in", err);
-                        PlayOfflineDialog d = new PlayOfflineDialog("mcDown", username, UserManager.getUUID(username), getResp());
-                        d.setVisible(true);
-                    }
-                    enableObjects();
-                    return;
-                }
-
-                RESPONSE = getResp();
-                Logger.logDebug("responseStr: " + responseStr);
-                String uuid = UserManager.getUUID(username);
-                if (responseStr.equals("good")) {
-                    Logger.logInfo("Login complete.");
-                    try {
-                        // save userdata, including new mojangData
-                        Main.getUserManager().write();
-                        Logger.logDebug("user data saved");
-                    } catch (IOException e) {
-                        Logger.logError("logindata saving failed!");
-                    }
-                    runGameUpdater();
-                } else if (uuid != null && !uuid.isEmpty() && RESPONSE != null && responseStr.equals("offline")) {
-                    Logger.logDebug("Asking user for offline mode");
-                    PlayOfflineDialog d = new PlayOfflineDialog("mcDown", username, uuid, RESPONSE);
-                    d.setVisible(true);
-                } else {
-                    Logger.logDebug("Bad responseStr, not starting MC");
-                    enableObjects();
-                    return;
-                }//if user doesn't want offline mode
-                enableObjects();
-            }
-        };
-        loginWorker.execute();
+        runGameUpdater(username);
+        enableObjects();
     }
 
     private Boolean checkVersion (File verFile, ModPack pack) {
@@ -518,7 +475,7 @@ public class LaunchFrame extends JFrame {
     /**
      * checks whether an update is needed, and then starts the update process off
      */
-    private void runGameUpdater () {
+    private void runGameUpdater(String user) {
 
         final String installPath = Settings.getSettings().getInstallPath();
         final ModPack pack = ModPack.getSelectedPack();
@@ -563,7 +520,7 @@ public class LaunchFrame extends JFrame {
         if (pack.getMcVersion().startsWith("1.6") || pack.getMcVersion().startsWith("1.7") || pack.getMcVersion().startsWith("1.8") || pack.getMcVersion().startsWith("14w")) {
             isLegacy = false;
         }
-        MCInstaller.setupNewStyle(installPath, pack, isLegacy, RESPONSE);
+        MCInstaller.setupNewStyle(installPath, pack, isLegacy, user);
     }
 
 

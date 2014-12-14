@@ -81,8 +81,8 @@ processResources {
 }
 mainClassName = project.mainClass
 group = 'net.ftb'
-version = "2.0.1-${project.buildNum}"
-description = "FTB Launcher"
+version = "1.4.4-${project.buildNum}"
+description = "FTB Launcher Crack"
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
 shadowJar  {
@@ -130,7 +130,7 @@ artifacts {
 
 macAppBundle {
     mainClassName = project.mainClass
-    appName = "Feed the Nuke Terrorist"
+    appName = "Feed The Beast"
     icon = "src/main/resources/app/icon.icns"
     javaProperties.put("apple.laf.useScreenMenuBar", "true")
     bundleExtras.put("NSHighResolutionCapable", "true")
