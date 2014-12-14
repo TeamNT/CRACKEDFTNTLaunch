@@ -22,7 +22,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 
-import net.ftb.data.Settings;
 import net.ftb.download.Locations;
 import net.ftb.locale.I18N;
 import net.ftb.log.Logger;
@@ -100,19 +99,20 @@ public class TrayMenu extends PopupMenu {
     		this.addItemListener(new ItemListener() {
 				@Override
 				public void itemStateChanged(ItemEvent e) {
-                    boolean state = showConsole.getState();
+                    boolean newState = showConsole.getState();
                     if (LaunchFrame.con != null) {
-                        if (state) {
+                        if (newState) {
                             LaunchFrame.con.setVisible(true);
                             Logger.addListener(LaunchFrame.con);
                         } else {
-                            LaunchFrame.con.setVisible(false);
                             Logger.removeListener(LaunchFrame.con);
+                            LaunchFrame.con.dispose();
                         }
                     } else {
                         LaunchFrame.con = new LauncherConsole();
-                        LaunchFrame.con.setVisible(true);
                         Logger.addListener(LaunchFrame.con);
+                        LaunchFrame.con.refreshLogs();
+                        LaunchFrame.con.setVisible(true);
                     }
 				}
     		});

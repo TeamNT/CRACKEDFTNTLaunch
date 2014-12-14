@@ -16,11 +16,15 @@
  */
 package net.ftb.util;
 
-import javax.swing.JOptionPane;
+import javax.swing.*;
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
 
 import net.ftb.gui.LaunchFrame;
 import net.ftb.locale.I18N;
 import net.ftb.log.Logger;
+
+import java.awt.Font;
 
 public class ErrorUtils {
     /**
@@ -76,9 +80,32 @@ public class ErrorUtils {
      */
     public static int tossOKIgnoreDialog(String message, int severity) {
         Object[] options = { I18N.getLocaleString("BUTTON_OK"), I18N.getLocaleString("BUTTON_IGNORE") };
-        int result = JOptionPane.showOptionDialog(LaunchFrame.getInstance(), 
+        return JOptionPane.showOptionDialog(LaunchFrame.getInstance(),
                 message + "\n" + I18N.getLocaleString("NAG_SCREEN_MESSAGE"), null,
                 JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
-        return result;
+    }
+
+    public static void showClickableMessage(String message, String url) {
+        JLabel l = new JLabel();
+        Font font = l.getFont();
+        StringBuilder html = new StringBuilder("");
+        html.append("<html><body style=\"" + "font-family:").append(font.getFamily()).append(";").append("font-weight:").append(font.isBold() ? "bold" : "normal").append(";").append("font-size:").append(font.getSize()).append("pt;").append("\">");
+
+        html.append(message).append(" ");
+        if ( url != null ){
+            html.append("<br><a href=\"").append(url).append("\">").append(url).append("</a>");
+        }
+
+        JEditorPane ep = new JEditorPane("text/html", html.toString());
+        ep.addHyperlinkListener(new HyperlinkListener() {
+            @Override
+            public void hyperlinkUpdate (HyperlinkEvent e)
+            {
+                if (e.getEventType().equals(HyperlinkEvent.EventType.ACTIVATED))
+                    OSUtils.browse(e.getURL().toString()); // roll your own link launcher or use Desktop if J6+
+            }
+        });
+        ep.setEditable(false);
+        JOptionPane.showMessageDialog(LaunchFrame.getInstance(), ep);
     }
 }

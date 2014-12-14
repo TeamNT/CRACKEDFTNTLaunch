@@ -18,7 +18,7 @@ WARN_JAVA6 = Java 6 rilevato. Java 7 è richiesto per la maggior parte delle mod
 CONSOLE_TITLE = Console
 CONSOLE_COPYCLIP = Copia a clipboard
 CONSOLE_CLIP_CONFIRM = Vuoi copiare tutto il log sul  tuo clipboard?
-CONSOLE_PASTEBIN = Copia su pastebin.com
+CONSOLE_PASTE = Copia su pastebin.com
 CONSOLE_SUPPORT = Bisogno di aiuto? Cliccami!
 
 # Map Tab
@@ -38,7 +38,7 @@ FORCE_UPDATE = Aggiornamento forzato?
 RAM_MAX = RAM Massima (MB)
 LANGUAGE = Lingua
 SHOW_CONSOLE = Mostra Console?
-OPT_JAVA_ARGS= Usa Optimization Arguments per computer veloce?
+OPT_JAVA_ARGS = Usa Optimization Arguments per computer veloce?
 USE_SYSTEM_PROXY = Usa Internet Proxy per scaricare i file?
 REOPEN_LAUNCHER = Riapri il launcher dopo essere uscito da minecraft?
 ADVANCED_OPTIONS = Opzioni Avanzate
@@ -85,7 +85,7 @@ ADVANCED_OPTIONS_DISABLEGOOGLEANALYTICS = Disabilita Google Analytic Tracking
 ADVANCED_OPTIONS_JAVA_PATH = Java Path:
 ADVANCED_OPTIONS_ADDJAVAOPTIONS = Parametri Java Aggiuntivia:
 ADVANCED_OPTIONS_DEBUGLAUNCHERVERBOSE = Extra Launcher Debugging
-ADVANCED_OPTIONS_BETA= Permeti di usare versioni beta del Launcher?
+ADVANCED_OPTIONS_BETA = Permeti di usare versioni beta del Launcher?
 
 # Update
 UPDATE_WICHUPDATE = Desideri aggiornare?
@@ -167,6 +167,9 @@ MAIN_CANCEL = Cancella
 MAIN_SUBMIT = Invia
 MAIN_REMOVE = Rimuovi
 MAIN_ADD = Agguingi
+BUTTON_IGNORE = Ignora
+BUTTON_OK = Ok
+NAG_SCREEN_MESSAGE = Clicca OK per continuare o IGNORA per tralasciare questo avvertimento in futuro
 
 # First run dialog
 INSTALL_TITLE = Prima Volta
@@ -176,3 +179,14 @@ INSTALL_CHANGE = Cambia
 # System Tray
 TRAY_QUIT = Esci
 TRAY_FTB_WEBSITE = Sito FTB
+
+# CheckInstallPath
+CIP_BADPATH = Luogo di installazione non supportata. Forge non supporta i seguenti \ncharacter(s): LISTA Per favore seleziona un nuovo luogo come
+CIP_PROGRAMFILES = Installare sotto C:\Program Files\ o simili non è supportato. \nPer favore seleziona un nuovo luogo come
+CIP_INTERNETFILES = Non puoi installare FTB nel tuo Temporary Internet Files directory. \nPer favore seleziona un nuovo luogo come
+CIP_USERPROFILE = Installare sotto C:\Users\<username> non è raccomandato e può causare problemi. \nConsigliamo di selezionare un nuovo luogo come
+CIP_WRITEPROTECT = Non è possibile scrivere nel luogo d'installazione di FTB. \nPer favore seleziona un cartella in cui hai permesso di scrivere.
+CIP_EXISTS = Non è stata trovata il luogo d'installazione di FTB!
+CIP_CREATE = Non è possibile creare il luogo d'installazione di FTB
+CIP_SELECTAGAIN = Per favore seleziona di nuovo!
+CIP_PLEASECHANGE = Per favore cambia il luogo d'installazione sotto il tab delle opzioni.

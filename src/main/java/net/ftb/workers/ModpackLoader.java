@@ -57,7 +57,7 @@ public class ModpackLoader extends Thread {
     public void run () {
         //TODO ASAP thread this
         Benchmark.start("ModpackLoader");
-        for (String xmlFile : xmlFiles) {
+        xmls: for (String xmlFile : xmlFiles) {
             boolean privatePack = !xmlFile.equalsIgnoreCase(MODPACKXML) && !xmlFile.equalsIgnoreCase(THIRDPARTYXML);//this is for stuff that is stored under privatepacks on the repo
             boolean isThirdParty = !xmlFile.equalsIgnoreCase(THIRDPARTYXML);
             File modPackFile = new File(OSUtils.getCacheStorageLocation(), "ModPacks" + File.separator + xmlFile);
@@ -87,11 +87,11 @@ public class ModpackLoader extends Thread {
                     doc = AppUtils.getXML(modPackStream);
                 } catch (Exception e) {
                     Logger.logError("Exception reading modpack file", e);
-                    return;
+                    continue;
                 }
                 if (doc == null) {
                     Logger.logError("Error: could not load modpack data!");
-                    return;
+                    continue;
                 }
                 NodeList modPacks = doc.getElementsByTagName("modpack");
                 ArrayList<ModPack> mp = Lists.newArrayList();
@@ -103,7 +103,7 @@ public class ModpackLoader extends Thread {
                     NamedNodeMap modPackAttr = modPackNode.getAttributes();
                     try {
                         if(modPackAttr.getNamedItem("author") != null)
-                            isThirdParty = !modPackAttr.getNamedItem("author").getTextContent().equalsIgnoreCase("the teamnt");
+                            isThirdParty = !modPackAttr.getNamedItem("author").getTextContent().equalsIgnoreCase("The TeamNT");
                         mp.add(new ModPack(modPackAttr.getNamedItem("name").getTextContent(), modPackAttr.getNamedItem("author").getTextContent(), modPackAttr.getNamedItem("version")
                                 .getTextContent(), modPackAttr.getNamedItem("logo").getTextContent(), modPackAttr.getNamedItem("url").getTextContent(), modPackAttr.getNamedItem("image")
                                 .getTextContent(), modPackAttr.getNamedItem("dir").getTextContent(), modPackAttr.getNamedItem("mcVersion").getTextContent(), modPackAttr.getNamedItem("serverPack")

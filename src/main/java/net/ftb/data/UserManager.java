@@ -78,6 +78,7 @@ public class UserManager {
         _users.clear();
         if (!OSUtils.verifyUUID()) {
             Logger.logError(I18N.getLocaleString("CHANGEDUUID"));
+            //TODO: GUI depencency here
             ProfileAdderDialog p = new ProfileAdderDialog(LaunchFrame.getInstance(), "CHANGEDUUID", true);
             p.setVisible(true);
             return;
@@ -254,8 +255,13 @@ public class UserManager {
 
     public static boolean getSaveMojangData (String username) {
         User temp = findUser(username);
+        return temp != null && temp.getSaveMojangData();
+    }
+
+    public static String getName ( String username) {
+        User temp = findUser(username);
         if(temp != null)
-            return temp.getSaveMojangData();
-        return false;
+            return temp.getName();
+        return null;
     }
 }

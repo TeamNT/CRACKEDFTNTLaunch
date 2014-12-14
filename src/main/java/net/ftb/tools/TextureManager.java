@@ -41,6 +41,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.border.EmptyBorder;
 
+import com.google.common.collect.Maps;
 import net.ftb.data.ModPack;
 import net.ftb.data.Settings;
 import net.ftb.data.TexturePack;
@@ -180,7 +181,7 @@ public class TextureManager extends JDialog {
                 }
                 out.flush();
                 out.close();
-                TrackerUtils.sendPageView(dir + " Install", dir + " / " + compDir + " / " + packVer);
+                TrackerUtils.sendPageView(dir + " Install", "Texture Packs / " + dir + " / " + compDir + " / " + packVer);
                 return true;
             }
             return false;
@@ -289,7 +290,7 @@ public class TextureManager extends JDialog {
         if (installedTextures != null) {
             installedTextures.clear();
         } else {
-            installedTextures = new HashMap<String, String>();
+            installedTextures = Maps.newHashMap();
         }
         if (textureVersionFile.exists()) {
             try {

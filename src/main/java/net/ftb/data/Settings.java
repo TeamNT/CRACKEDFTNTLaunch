@@ -37,7 +37,6 @@ import java.util.Properties;
 
 import lombok.Getter;
 import lombok.Setter;
-import net.ftb.gui.LaunchFrame;
 import net.ftb.log.Logger;
 import net.ftb.util.ErrorUtils;
 import net.ftb.util.OSUtils;
@@ -55,6 +54,8 @@ public class Settings extends Properties {
     @Getter
     @Setter
     private boolean forceUpdateEnabled = false;
+    @Getter
+    private boolean noConfig = false;
 
     static {
         try {
@@ -69,7 +70,7 @@ public class Settings extends Properties {
         if (file.exists()) {
             load(new FileInputStream(file));
         } else {
-            LaunchFrame.noConfig = true;
+            noConfig = true;
         }
     }
 
@@ -104,7 +105,12 @@ public class Settings extends Properties {
     }
 
     public String getInstallPath () {
-        return getProperty("installPath", OSUtils.getDefInstallPath());
+        String commandLinePath = CommandLineSettings.getSettings().getInstallDir();
+        if (commandLinePath != null && !commandLinePath.isEmpty()) {
+            return commandLinePath;
+        } else {
+            return getProperty("installPath", OSUtils.getDefInstallPath());
+        }
     }
 
     public void setInstallPath (String path) {
@@ -154,7 +160,6 @@ public class Settings extends Properties {
     }
 
     public String getDefaultJavaPath () {
-        String separator = System.getProperty("file.separator");
         JavaInfo javaVersion;
 
         if (OSUtils.getCurrentOS() == OS.MACOSX) {
@@ -294,8 +299,10 @@ public class Settings extends Properties {
         String out = "";
         String sep = "";
         for (String s : codes) {
-            out += sep + s;
-            sep = ",";
+            if (!s.isEmpty()) {
+                out += sep + s;
+                sep = ",";
+            }
         }
         setProperty("privatePacks", out);
     }

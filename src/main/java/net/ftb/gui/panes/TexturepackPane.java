@@ -65,7 +65,7 @@ public class TexturepackPane extends JPanel implements ILauncherPane, TexturePac
     private JButton textureButton;
 
     private static JLabel typeLbl;
-    public static String compatible = "All", resolution = "All";
+    public static String compatible = I18N.getLocaleString("MAIN_ALL"), resolution = I18N.getLocaleString("MAIN_ALL");
     private JButton filter;
     private static boolean texturePacksAdded = false;
     private static int selectedTexturePack = 0;
@@ -129,6 +129,8 @@ public class TexturepackPane extends JPanel implements ILauncherPane, TexturePac
 
         textureButton = new JButton(I18N.getLocaleString("SWAP_TEXTURE"));
         textureButton.setBounds(720, 5, 105, 25);
+        textureButton.setBackground(UIManager.getColor("control").darker().darker());
+        textureButton.setForeground(UIManager.getColor("text").darker());
         textureButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
@@ -236,7 +238,7 @@ public class TexturepackPane extends JPanel implements ILauncherPane, TexturePac
         p.add(logo);
         texturePackPanels.add(p);
         texturePacks.add(p);
-        if (compatible.equalsIgnoreCase("all") && resolution.equalsIgnoreCase("all")) {
+        if (compatible.equalsIgnoreCase(I18N.getLocaleString("MAIN_ALL")) && resolution.equalsIgnoreCase(I18N.getLocaleString("MAIN_ALL"))) {
             texturePacks.setMinimumSize(new Dimension(420, (TexturePack.getTexturePackArray().size()) * 55));
             texturePacks.setPreferredSize(new Dimension(420, (TexturePack.getTexturePackArray().size()) * 55));
         } else {

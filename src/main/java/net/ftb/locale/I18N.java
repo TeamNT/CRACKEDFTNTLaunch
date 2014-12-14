@@ -19,11 +19,11 @@ package net.ftb.locale;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Properties;
 
 import com.google.common.collect.Maps;
-import net.ftb.gui.LaunchFrame;
 import net.ftb.log.Logger;
 import net.ftb.util.OSUtils;
 
@@ -47,6 +47,13 @@ public class I18N {
         locales.clear();
         try {
             locales.load(new InputStreamReader(I18N.class.getResource("/i18n/" + file).openStream(), "UTF8"));
+            // clean empty entries
+            for (Enumeration<Object> e = locales.keys(); e.hasMoreElements();) {
+                String key = (String)e.nextElement();
+                if (locales.get(key).equals("")) {
+                    locales.remove(key);
+                }
+            }
         } catch (IOException e) {
             Logger.logError("[i18n] Could not load language file", e);
         }
@@ -61,7 +68,6 @@ public class I18N {
             localeIndices.put(0, "enUS");
         }
         addFiles();
-        LaunchFrame.i18nLoaded = true;
     }
 
     /**

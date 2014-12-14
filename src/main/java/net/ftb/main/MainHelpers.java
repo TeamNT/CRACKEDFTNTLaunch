@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.ftb.gui;
+package net.ftb.main;
 
 import net.ftb.data.Constants;
 import net.ftb.data.Settings;
@@ -28,7 +28,7 @@ import java.io.*;
 
 import javax.swing.JOptionPane;
 
-public class LaunchFrameHelpers {
+public class MainHelpers {
     public static void printInfo() {
         Logger.logInfo("FTBLaunch starting up (version " + Constants.version + " Build: " + Constants.buildNumber + ")");
         Logger.logInfo("Java version: " + System.getProperty("java.version"));
@@ -76,19 +76,23 @@ public class LaunchFrameHelpers {
                 osw.write("jjw123" + System.getProperty("line.separator"));
                 osw.write("unv_annihilator" + System.getProperty("line.separator"));
                 osw.write("ProgWML6" + System.getProperty("line.separator"));
+                osw.write("Launcher Team Members" + System.getProperty("line.separator"));
+                osw.write("IoP" + System.getProperty("line.separator"));
+                osw.write("Viper-7" + System.getProperty("line.separator") + System.getProperty("line.separator"));
                 osw.write("Major Launcher Dev Contributors" + System.getProperty("line.separator"));
                 osw.write("LexManos" + System.getProperty("line.separator"));
-                osw.write("IoP" + System.getProperty("line.separator") + System.getProperty("line.separator"));
-                osw.write("Viper-7" + System.getProperty("line.separator") + System.getProperty("line.separator"));
+                osw.write("Asyncronous" + System.getProperty("line.separator"));
                 osw.write("Vbitz" + System.getProperty("line.separator") + System.getProperty("line.separator"));
                 osw.write("Web Developers:" + System.getProperty("line.separator"));
                 osw.write("Captainnana" + System.getProperty("line.separator"));
                 osw.write("Rob" + System.getProperty("line.separator") + System.getProperty("line.separator"));
                 osw.write("Modpack Team:" + System.getProperty("line.separator"));
                 osw.write("Lathanael" + System.getProperty("line.separator"));
-                osw.write("Watchful11" + System.getProperty("line.separator"));
                 osw.write("Jadedcat" + System.getProperty("line.separator"));
-                osw.write("Eyamaz" + System.getProperty("line.separator"));
+                osw.write("Eyamaz" + System.getProperty("line.separator") + System.getProperty("line.separator"));
+                osw.write("Third Party Modpack Team:" + System.getProperty("line.separator"));
+                osw.write("Watchful11" + System.getProperty("line.separator"));
+                osw.write("TFox83" + System.getProperty("line.separator"));
 
                 osw.flush();
                 osw.close();
@@ -104,7 +108,7 @@ public class LaunchFrameHelpers {
         }
 
         if (!Settings.getSettings().getLoaded()) {
-            TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "OS: " + System.getProperty("os.name") + " : " + System.getProperty("os.arch"));
+            TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "OS / " + System.getProperty("os.name") + " : " + System.getProperty("os.arch"));
             TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "Unique User (Settings)");
             Settings.getSettings().setLoaded(true);
         }

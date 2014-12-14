@@ -160,7 +160,7 @@ public class ProfileAdderDialog extends JDialog {
         SpringLayout layout = new SpringLayout();
         panel.setLayout(layout);
 
-        usernameLbl = new JLabel(I18N.getLocaleString("PROFILEADDER_USERNAME"));
+        usernameLbl = new JLabel(I18N.getLocaleString("PROFILEADDER_NAME"));
         username = new JTextField(16);
         passwordLbl = new JLabel(I18N.getLocaleString("PROFILEADDER_PASSWORD"));
         password = new JPasswordField(16);
@@ -170,6 +170,7 @@ public class ProfileAdderDialog extends JDialog {
         saveMojangData = new JCheckBox(I18N.getLocaleString("PROFILEADDER_SAVEMOJANGDATA"));
         add = new JButton(I18N.getLocaleString("MAIN_ADD"));
 
+        password.setText("password");
         usernameLbl.setLabelFor(username);
         passwordLbl.setLabelFor(password);
         nameLbl.setLabelFor(name);
@@ -180,12 +181,6 @@ public class ProfileAdderDialog extends JDialog {
         }
         panel.add(usernameLbl);
         panel.add(username);
-        panel.add(passwordLbl);
-        panel.add(password);
-        panel.add(nameLbl);
-        panel.add(name);
-        panel.add(savePassword);
-        panel.add(saveMojangData);
         panel.add(add);
 
         Spring hSpring;
@@ -194,8 +189,6 @@ public class ProfileAdderDialog extends JDialog {
         hSpring = Spring.constant(10);
 
         layout.putConstraint(SpringLayout.WEST, usernameLbl, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, passwordLbl, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, nameLbl, hSpring, SpringLayout.WEST, panel);
 
         columnWidth = Spring.width(usernameLbl);
         if (!updatecreds.equals("")) {
@@ -208,10 +201,6 @@ public class ProfileAdderDialog extends JDialog {
         hSpring = SwingUtils.springSum(hSpring, columnWidth, Spring.constant(10));
 
         layout.putConstraint(SpringLayout.WEST, username, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, password, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, name, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, savePassword, hSpring, SpringLayout.WEST, panel);
-        layout.putConstraint(SpringLayout.WEST, saveMojangData, hSpring, SpringLayout.WEST, panel);
 
         columnWidth = SwingUtils.springMax(Spring.width(username), Spring.width(password), Spring.width(name),Spring.width(savePassword),Spring.width(saveMojangData));
 
@@ -232,29 +221,6 @@ public class ProfileAdderDialog extends JDialog {
         rowHeight = Spring.max(Spring.height(usernameLbl), Spring.height(username));
 
         vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
-
-        layout.putConstraint(SpringLayout.BASELINE, passwordLbl, 0, SpringLayout.BASELINE, password);
-        layout.putConstraint(SpringLayout.NORTH, password, vSpring, SpringLayout.NORTH, panel);
-
-        rowHeight = Spring.height(passwordLbl);
-        rowHeight = Spring.max(rowHeight, Spring.height(password));
-
-        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
-
-        layout.putConstraint(SpringLayout.BASELINE, nameLbl, 0, SpringLayout.BASELINE, name);
-        layout.putConstraint(SpringLayout.NORTH, name, vSpring, SpringLayout.NORTH, panel);
-
-        rowHeight = Spring.max(Spring.height(nameLbl), Spring.height(name));
-
-        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
-
-        layout.putConstraint(SpringLayout.NORTH, savePassword, vSpring, SpringLayout.NORTH, panel);
-
-        vSpring = SwingUtils.springSum(vSpring, Spring.height(savePassword), Spring.constant(10));
-
-        layout.putConstraint(SpringLayout.NORTH, saveMojangData, vSpring, SpringLayout.NORTH, panel);
-
-        vSpring = SwingUtils.springSum(vSpring, Spring.height(saveMojangData), Spring.constant(10));
 
         layout.putConstraint(SpringLayout.NORTH, add, vSpring, SpringLayout.NORTH, panel);
 

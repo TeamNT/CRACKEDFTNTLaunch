@@ -28,7 +28,6 @@ import javax.swing.JTextArea;
 import javax.swing.Spring;
 import javax.swing.SpringLayout;
 
-import net.ftb.data.LoginResponse;
 import net.ftb.data.ModPack;
 import net.ftb.data.Settings;
 import net.ftb.gui.LaunchFrame;
@@ -42,7 +41,7 @@ public class PlayOfflineDialog extends JDialog {
     private JButton play;
     private JButton abort;
 
-    public PlayOfflineDialog(String cause, final String username, final String uuid, final LoginResponse resp) {
+    public PlayOfflineDialog(String cause, final String username, final String uuid) {
         super(LaunchFrame.getInstance(), true);
         setupGui();
 
@@ -61,8 +60,7 @@ public class PlayOfflineDialog extends JDialog {
                     unique = "1234567890";
                 else
                     unique = uuid;
-                MCInstaller.launchMinecraft(Settings.getSettings().getInstallPath(), ModPack.getSelectedPack(),
-                        new LoginResponse("1", "token", username, "offlinemods", unique, resp.getAuth()), legacy);
+                MCInstaller.launchMinecraft(Settings.getSettings().getInstallPath(), ModPack.getSelectedPack(), username, legacy);
 
             }
         });

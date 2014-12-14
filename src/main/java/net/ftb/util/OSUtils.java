@@ -17,9 +17,7 @@
 package net.ftb.util;
 
 import java.awt.Desktop;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.Method;
@@ -31,10 +29,14 @@ import java.security.CodeSource;
 import java.util.Enumeration;
 import java.util.Map;
 
+import javax.swing.text.html.StyleSheet;
+
 import lombok.Getter;
+import net.ftb.data.CommandLineSettings;
 import net.ftb.gui.LaunchFrame;
 import net.ftb.log.Logger;
 import net.ftb.util.winreg.JavaFinder;
+import net.ftb.util.winreg.RuntimeStreamer;
 
 public class OSUtils {
     private static byte[] cachedMacAddress;
@@ -47,6 +49,7 @@ public class OSUtils {
      */
     @Getter
     private static int numCores;
+    private static byte[] hardwareID;
 
     public static enum OS {
         WINDOWS, UNIX, MACOSX, OTHER,
@@ -79,6 +82,9 @@ public class OSUtils {
      * @return string containing dynamic storage location
      */
     public static String getDynamicStorageLocation () {
+        if (CommandLineSettings.getSettings().getDynamicDir() != null && !CommandLineSettings.getSettings().getDynamicDir().isEmpty()) {
+            return CommandLineSettings.getSettings().getDynamicDir();
+        }
         switch (getCurrentOS()) {
         case WINDOWS:
             return System.getenv("APPDATA") + "/ftntlauncher/";
@@ -98,6 +104,9 @@ public class OSUtils {
      * @return string containing cache storage location
      */
     public static String getCacheStorageLocation () {
+        if (CommandLineSettings.getSettings().getCacheDir() != null && !CommandLineSettings.getSettings().getCacheDir().isEmpty()) {
+            return CommandLineSettings.getSettings().getCacheDir();
+        }
         switch (getCurrentOS()) {
         case WINDOWS:
             if (System.getenv("LOCALAPPDATA") != null && System.getenv("LOCALAPPDATA").length() > 5)
@@ -107,7 +116,6 @@ public class OSUtils {
         case MACOSX:
             return cachedUserHome + "/Library/Application Support/ftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -124,13 +132,13 @@ public class OSUtils {
                 // Migrate cached archives from the user's roaming profile to their local cache
 
                 Logger.logInfo("Migrating cached Maps from Roaming to Local storage");
-                FileUtils.move(new File(dynamicDir, "Maps"), new File(cacheDir, "Maps"));
+                FTBFileUtils.move(new File(dynamicDir, "Maps"), new File(cacheDir, "Maps"));
 
                 Logger.logInfo("Migrating cached Modpacks from Roaming to Local storage");
-                FileUtils.move(new File(dynamicDir, "ModPacks"), new File(cacheDir, "ModPacks"));
+                FTBFileUtils.move(new File(dynamicDir, "ModPacks"), new File(cacheDir, "ModPacks"));
 
                 Logger.logInfo("Migrating cached Texturepacks from Roaming to Local storage");
-                FileUtils.move(new File(dynamicDir, "TexturePacks"), new File(cacheDir, "TexturePacks"));
+                FTBFileUtils.move(new File(dynamicDir, "TexturePacks"), new File(cacheDir, "TexturePacks"));
 
                 Logger.logInfo("Migration complete.");
             }
@@ -357,6 +365,86 @@ public class OSUtils {
     }
 
     /**
+     *
+     * @return Unique Id based on hardware
+     */
+    public static byte[] getHardwareID () {
+        if (hardwareID== null) {
+            hardwareID = genHardwareID();
+        }
+        return hardwareID;
+    }
+
+    private static byte[] genHardwareID () {
+        switch (getCurrentOS()) {
+        case WINDOWS:
+            return genHardwareIDWINDOWS();
+        case UNIX:
+            return genHardwareIDUNIX();
+        case MACOSX:
+            return genHardwareIDMACOSX();
+        default:
+            return null;
+        }
+    }
+    private static byte[] genHardwareIDUNIX () {
+        String line;
+        if (CommandLineSettings.getSettings().isUseMac()) {
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader("/etc/machine-id"));
+                line = reader.readLine();
+            } catch (Exception e) {
+                Logger.logDebug("failed", e);
+                return new byte[] { };
+            }
+            return line.getBytes();
+        } else {
+            return new byte[] { };
+        }
+    }
+
+    private static byte[] genHardwareIDMACOSX () {
+        String line;
+        try {
+            Process command = Runtime.getRuntime().exec(new String[] {"system_profiler", "SPHardwareDataType"});
+            BufferedReader in = new BufferedReader(new InputStreamReader(command.getInputStream()));
+            while ((line = in.readLine()) != null) {
+                if (line.contains("Serial Number"))
+                    //TODO: does that more checks?
+                    return line.split(":")[1].trim().getBytes();
+            }
+            return new byte[]{};
+        } catch (Exception e) {
+            Logger.logDebug("failed", e);
+            return new byte[]{};
+        }
+    }
+
+    private static byte[] genHardwareIDWINDOWS() {
+        String processOutput;
+        try {
+            processOutput = RuntimeStreamer.execute(new String[] {"wmic", "bios", "get", "serialnumber"});
+            /*
+             * wmic's output has special formatting:
+             * SerialNumber<SP><SP><SP><CR><CR><LF>
+             * 00000000000000000<SP><CR><CR><LF><CR><CR><LF>
+             *
+             * readLin()e uses <LF>, <CR> or <CR><LF> as line ending => we need to get third line from RuntimeStreamers output
+             */
+            String line = processOutput.split("\n")[2].trim();
+            // at least VM will report serial to be 0. Does real hardware do it?
+            if (line.equals("0")) {
+                return new byte[] { };
+            } else{
+                return line.trim().getBytes();
+            }
+        } catch (Exception e) {
+            Logger.logDebug("failed", e);
+            return new byte[] { };
+        }
+    }
+
+    /**
      * Opens the given URL in the default browser
      * @param url The URL
      */
@@ -411,5 +499,19 @@ public class OSUtils {
         environment.remove("_JAVA_OPTIONS");
         environment.remove("JAVA_TOOL_OPTIONS");
         environment.remove("JAVA_OPTIONS");
+    }
+    
+    public static StyleSheet makeStyleSheet(String name){
+        try{
+            StyleSheet sheet = new StyleSheet();
+            Reader reader = new InputStreamReader(System.class.getResourceAsStream("/css/" + name + ".css"));
+            sheet.loadRules(reader, null);
+            reader.close();
+
+            return sheet;
+        } catch(Exception ex){
+            ex.printStackTrace();
+            return null;
+        }
     }
 }
