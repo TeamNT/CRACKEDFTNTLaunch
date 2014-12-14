@@ -87,11 +87,11 @@ public class OSUtils {
         }
         switch (getCurrentOS()) {
         case WINDOWS:
-            return System.getenv("APPDATA") + "/ftntlauncher/";
+            return System.getenv("APPDATA") + "/CRACKEDftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
+            return cachedUserHome + "/Library/Application Support/CRACKEDftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftntlauncher/";
+            return cachedUserHome + "/.CRACKEDftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -110,11 +110,11 @@ public class OSUtils {
         switch (getCurrentOS()) {
         case WINDOWS:
             if (System.getenv("LOCALAPPDATA") != null && System.getenv("LOCALAPPDATA").length() > 5)
-                return System.getenv("LOCALAPPDATA") + "/ftntlauncher/";
+                return System.getenv("LOCALAPPDATA") + "/CRACKEDftntlauncher/";
             else
-                return System.getenv("APPDATA") + "/ftntlauncher/";
+                return System.getenv("APPDATA") + "/CRACKEDftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
+            return cachedUserHome + "/Library/Application Support/CRACKEDftntlauncher/";
         case UNIX:
         default:
             return getDefInstallPath() + "/temp/";
