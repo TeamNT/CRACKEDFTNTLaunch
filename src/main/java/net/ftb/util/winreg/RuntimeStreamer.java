@@ -17,11 +17,11 @@ import java.io.InputStreamReader;
  * Helper class to fetch the stdout and stderr outputs from started Runtime execs
  * Modified from http://www.javaworld.com/javaworld/jw-12-2000/jw-1229-traps.html?page=4
  *****************************************************************************/
-public class RuntimeStreamer extends Thread {
+class RuntimeStreamer extends Thread {
     InputStream is;
     String lines;
 
-    RuntimeStreamer (InputStream is) {
+    RuntimeStreamer(InputStream is) {
         this.is = is;
         this.lines = "";
     }
@@ -55,8 +55,6 @@ public class RuntimeStreamer extends Thread {
             RuntimeStreamer errorStreamer = new RuntimeStreamer(proc.getErrorStream());
             outputStreamer.start();
             errorStreamer.start();
-            // close process' stdin
-            proc.getOutputStream().close();
             proc.waitFor();
             return outputStreamer.contents() + errorStreamer.contents();
         } catch (Throwable t) {

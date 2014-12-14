@@ -16,70 +16,84 @@
  */
 package net.ftb.gui;
 
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.*;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.jar.Attributes;
+import java.util.jar.Manifest;
+
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTabbedPane;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.UIManager.LookAndFeelInfo;
+import javax.swing.WindowConstants;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+
+import com.google.common.collect.Maps;
+import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+
 import lombok.Getter;
 import lombok.Setter;
-import net.ftb.data.CommandLineSettings;
 import net.ftb.data.Constants;
 import net.ftb.data.LauncherStyle;
 import net.ftb.data.LoginResponse;
 import net.ftb.data.Map;
 import net.ftb.data.ModPack;
 import net.ftb.data.Settings;
+import net.ftb.data.TexturePack;
 import net.ftb.data.UserManager;
 import net.ftb.download.Locations;
 import net.ftb.events.EnableObjectsEvent;
+import net.ftb.gui.dialogs.FirstRunDialog;
+import net.ftb.gui.dialogs.LauncherUpdateDialog;
 import net.ftb.gui.dialogs.LoadingDialog;
 import net.ftb.gui.dialogs.ModPackVersionChangeDialog;
 import net.ftb.gui.dialogs.PasswordDialog;
 import net.ftb.gui.dialogs.PlayOfflineDialog;
 import net.ftb.gui.dialogs.ProfileAdderDialog;
 import net.ftb.gui.dialogs.ProfileEditorDialog;
-import net.ftb.gui.panes.FTBPacksPane;
-import net.ftb.gui.panes.ILauncherPane;
-import net.ftb.gui.panes.MapUtils;
-import net.ftb.gui.panes.NewsPane;
-import net.ftb.gui.panes.OptionsPane;
-import net.ftb.gui.panes.TexturepackPane;
-import net.ftb.gui.panes.ThirdPartyPane;
+import net.ftb.gui.panes.*;
 import net.ftb.locale.I18N;
+import net.ftb.locale.I18N.Locale;
+import net.ftb.log.LogLevel;
+import net.ftb.log.LogSource;
+import net.ftb.log.LogWriter;
 import net.ftb.log.Logger;
-import net.ftb.main.Main;
+import net.ftb.log.OutputOverride;
+import net.ftb.log.StdOutLogger;
 import net.ftb.minecraft.MCInstaller;
 import net.ftb.tools.MapManager;
 import net.ftb.tools.ModManager;
 import net.ftb.tools.ProcessMonitor;
 import net.ftb.tools.TextureManager;
-import net.ftb.util.Benchmark;
-import net.ftb.util.DownloadUtils;
-import net.ftb.util.ErrorUtils;
-import net.ftb.util.FTBFileUtils;
-import net.ftb.util.OSUtils;
-import net.ftb.util.ObjectUtils;
-import net.ftb.util.TrackerUtils;
+import net.ftb.tracking.google.AnalyticsConfigData;
+import net.ftb.tracking.google.JGoogleAnalyticsTracker;
+import net.ftb.tracking.google.JGoogleAnalyticsTracker.GoogleAnalyticsVersion;
+import net.ftb.updater.UpdateChecker;
+import net.ftb.util.*;
+import net.ftb.util.CheckInstallPath.Action;
+import net.ftb.util.OSUtils.OS;
 import net.ftb.util.winreg.JavaInfo;
-import net.ftb.util.winreg.JavaVersion;
+import net.ftb.workers.AuthlibDLWorker;
 import net.ftb.workers.LoginWorker;
-import net.ftb.workers.NewsWorker;
 import net.ftb.workers.UnreadNewsWorker;
-
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 
 @SuppressWarnings("serial")
 public class LaunchFrame extends JFrame {
@@ -89,44 +103,54 @@ public class LaunchFrame extends JFrame {
     private JPanel footer = new JPanel();
     private JLabel footerLogo = new JLabel(new ImageIcon(this.getClass().getResource(Locations.FTBLOGO)));
     private JLabel footerCreeper = new JLabel(new ImageIcon(this.getClass().getResource(Locations.CHLOGO)));
-    private JLabel footerTUG = new JLabel(new ImageIcon(this.getClass().getResource(Locations.TUGLOGO)));
     private JLabel tpInstallLocLbl = new JLabel();
     @Getter
-    private final JButton launch = new JButton(), edit = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
+    private final JButton launch = new JButton(), edit = new JButton(), donate = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
             tpInstall = new JButton();
 
     private static String[] dropdown_ = { "Select Profile", "Create Profile" };
     private static JComboBox users, tpInstallLocation, mapInstallLocation;
-    private static AtomicInteger checkDoneLoadingCallCount = new AtomicInteger(0);
     /**
      * @return - Outputs LaunchFrame instance
      */
     @Getter
-    @Setter
     private static LaunchFrame instance = null;
-
+    
+    public static boolean canUseAuthlib;
     public static int minUsable = -1;
     public final JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+
+    protected static UserManager userManager;
 
     public FTBPacksPane modPacksPane;
     public ThirdPartyPane thirdPartyPane;
     public MapUtils mapsPane;
     public TexturepackPane tpPane;
     public OptionsPane optionsPane;
-
+    
     public static TrayMenu trayMenu;
-
+    
+    public static boolean noConfig = false;
     public static boolean allowVersionChange = false;
     public static boolean doVersionBackup = false;
     public static boolean MCRunning = false;
+    public static boolean i18nLoaded = false;
     public static LauncherConsole con;
     public static String tempPass = "";
     public static Panes currentPane = Panes.MODPACK;
+    public static AnalyticsConfigData AnalyticsConfigData = new AnalyticsConfigData("UA-37330489-2");
+    public static JGoogleAnalyticsTracker tracker;
     public static LoadingDialog loader;
+
 
     @Getter
     @Setter
     private static ProcessMonitor procMonitor;
+    /**
+    * @return FTB Launcher event bus
+    */
+    @Getter
+    private EventBus eventBus = new EventBus();
 
     public enum Panes {
         NEWS, OPTIONS, MODPACK, THIRDPARTY, TEXTURE
@@ -135,43 +159,289 @@ public class LaunchFrame extends JFrame {
     private boolean tpEnabled = true;
 
     /**
+     * Launch the application.
+     * @param args - CLI arguments
+     */
+    public static void main (String[] args) {
+        Benchmark.start("main");
+        /*
+         *  Create dynamic storage location as soon as possible
+         */
+        OSUtils.createStorageLocations();
+
+        // Use IPv4 when possible, only use IPv6 when connecting to IPv6 only addresses
+        System.setProperty("java.net.preferIPv4Stack", "true");
+
+        if (Settings.getSettings().getUseSystemProxy()) {
+            // Use system default proxy settings
+            System.setProperty("java.net.useSystemProxies", "true");
+        }
+
+        if (new File(Settings.getSettings().getInstallPath(), Locations.launcherLogFile).exists()) {
+            new File(Settings.getSettings().getInstallPath(), Locations.launcherLogFile).delete();
+        }
+
+        if (new File(Settings.getSettings().getInstallPath(), Locations.minecraftLogFile).exists()) {
+            new File(Settings.getSettings().getInstallPath(), Locations.minecraftLogFile).delete();
+        }
+
+        /*
+         * Create new StdoutLogger as soon as possible
+         */
+        Logger.addListener(new StdOutLogger());
+        /*
+         * Setup System.out and System.err redirection as soon as possible
+         */
+        System.setOut(new OutputOverride(System.out, LogLevel.INFO));
+        System.setErr(new OutputOverride(System.err, LogLevel.ERROR));
+
+        /*
+         * Setup LogWriters as soon as possible
+         * At first run log will be created same directory with launcher
+         */
+        try {
+            Logger.addListener(new LogWriter(new File(Settings.getSettings().getInstallPath(), Locations.launcherLogFile), LogSource.LAUNCHER));
+            Logger.addListener(new LogWriter(new File(Settings.getSettings().getInstallPath(), Locations.minecraftLogFile), LogSource.EXTERNAL));
+        } catch (IOException e1) {
+            if (!noConfig) {
+                Logger.logError("Could not create LogWriters. Check your FTB installation location write access", e1);
+            }
+        }
+        URL mf = LaunchFrame.class.getResource("/buildproperties.properties");
+        int beta = 9999999;
+        String mfStr = "";
+        try {
+            Properties props = new Properties();
+            props.load(mf.openStream());
+            mfStr  = props.getProperty("LauncherJenkins");
+            if(!mfStr.equals("${LauncherJenkins}"))
+                beta = Integer.parseInt(mfStr);
+            Logger.logDebug("FTB Launcher CI Build #: " + beta + ", Git SHA: " + props.getProperty("Git-SHA"));
+        } catch (Exception e) {
+            Logger.logError("Error getting beta information, assuming beta channel not usable!", e);
+            beta = 9999999;
+        }
+        final int beta_ = beta;
+        /*
+         *  Posts information about OS, JVM and launcher version into Google Analytics
+         */
+        AnalyticsConfigData.setUserAgent("Java/" + System.getProperty("java.version") + " (" + System.getProperty("os.name") + "; " + System.getProperty("os.arch") + ")");
+        tracker = new JGoogleAnalyticsTracker(AnalyticsConfigData, GoogleAnalyticsVersion.V_4_7_2);
+        tracker.setEnabled(true);
+        TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "Launcher Start v" + Constants.version + "." + beta);
+        if (!new File(OSUtils.getDynamicStorageLocation(), "FTBOSSent" + Constants.version + "." + beta + ".txt").exists()) {
+            TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "Launcher " + Constants.version + "." + beta + " OS " + OSUtils.getOSString());
+            try {
+                new File(OSUtils.getDynamicStorageLocation(), "FTBOSSent" + Constants.version + ".txt").createNewFile();
+            } catch (IOException e) {
+                Logger.logError("Error creating os cache text file");
+            }
+        }
+
+        LaunchFrameHelpers.printInfo();
+
+        /*
+         * Resolves servers in background thread
+         */
+        DownloadUtils thread = new DownloadUtils();
+        thread.start();
+
+        /*
+         * Setup GUI style & create and show Splash screen in EDT
+         * NEVER add code with Thread.sleep() or I/O blocking, including network usage in EDT
+         *  => If this guideline is followed then GUI should work smoothly
+         */
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run () {
+                StyleUtil.loadUiStyles();
+                try {
+                    for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                        if ("Nimbus".equals(info.getName())) {
+                            UIManager.setLookAndFeel(info.getClassName());
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    try {
+                        UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+                    } catch (Exception e1) {
+                    }
+                }
+                loader = new LoadingDialog();
+                loader.setModal(false);
+                loader.setVisible(true);
+
+                I18N.setupLocale();
+                I18N.setLocale(Settings.getSettings().getLocale());
+
+                if (noConfig) {
+                    FirstRunDialog firstRunDialog = new FirstRunDialog();
+                    firstRunDialog.setVisible(true);
+                }
+
+                LoadingDialog.setProgress(120);
+
+                File installDir = new File(Settings.getSettings().getInstallPath());
+                if (!installDir.exists()) {
+                    installDir.mkdirs();
+                }
+
+                // CheckInstallPath() does Error/Warning logging in english
+                CheckInstallPath checkResult = new CheckInstallPath(Settings.getSettings().getInstallPath(), true);
+                if (checkResult.action == Action.BLOCK || checkResult.action == Action.WARN) {
+                    // ErrorUtils.tossOKIgnoreDialog() does not write logs => can be called with localized strings
+                    int result = ErrorUtils.tossOKIgnoreDialog(checkResult.localizedMessage, (checkResult.action == Action.BLOCK)?JOptionPane.ERROR_MESSAGE:JOptionPane.WARNING_MESSAGE);
+                    // pressing OK or closing dialog does not do anything
+                    if (result != 0 && result != JOptionPane.CLOSED_OPTION) {
+                        // if user select ignore we save setting and that type of error will be ignored
+                        if (checkResult.setting != null) {
+                            Settings.getSettings().setBoolean(checkResult.setting, true);
+                            Settings.getSettings().save();
+                        }
+                    }
+                }
+
+                if (!OSUtils.is64BitOS()) {
+                    LaunchFrameHelpers.tossNag("launcher_32OS", I18N.getLocaleString("WARN_32BIT_OS"));
+                }
+                if (OSUtils.is64BitOS() && !Settings.getSettings().getCurrentJava().is64bits) {
+                    LaunchFrameHelpers.tossNag("launcher_32java", I18N.getLocaleString("WARN_32BIT_JAVA"));
+                }
+                JavaInfo java = Settings.getSettings().getCurrentJava();
+                if (java.getMajor() < 1 || (java.getMajor() == 1 && java.getMinor() < 7)) {
+                    LaunchFrameHelpers.tossNag("launcher_java6", I18N.getLocaleString("WARN_JAVA6"));
+                }
+
+                LoadingDialog.setProgress(130);
+
+                // Store this in the cache (local) storage, since it's machine specific.
+                userManager = new UserManager(new File(OSUtils.getCacheStorageLocation(), "logindata"), new File(OSUtils.getDynamicStorageLocation(), "logindata"));
+
+                LoadingDialog.setProgress(140);
+
+                if (Settings.getSettings().getConsoleActive()) {
+                    con = new LauncherConsole();
+                    con.setVisible(true);
+                    Logger.addListener(con);
+                    con.scrollToBottom();
+                }
+
+                LaunchFrameHelpers.googleAnalytics();
+
+                LoadingDialog.setProgress(160);
+
+                /*  Delay startup until the i18n update thread completes it's work
+                 *  and populates the localeIndices, allowing OptionsTab to load
+                 *  correctly.
+                 */
+                AppUtils.waitForLock(i18nLoaded);
+
+                LaunchFrame frame = new LaunchFrame(2);
+                instance = frame;
+                
+                // Set up System Tray
+                if(SystemTray.isSupported()) {
+                	setUpSystemTray();
+                } else {
+                	Logger.logWarn("System Tray not supported");
+                }
+
+                /*
+                 * Execute AuthlibDLWorker swingworker. done() will enable launch button as soon as possible
+                 */
+                AuthlibDLWorker authworker = new AuthlibDLWorker(OSUtils.getDynamicStorageLocation() + File.separator + "authlib" + File.separator, "1.5.13") {
+                    @Override
+                    protected void done () {
+                        LaunchFrame.getInstance().getLaunch().setEnabled(true);
+                    }
+                };
+                authworker.execute();
+
+                LoadingDialog.setProgress(170);
+
+                Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                    @Override
+                    public void uncaughtException (Thread t, Throwable e) {
+                        Logger.logError("Unhandled exception in " + t.toString(), e);
+                    }
+                });
+
+                /*
+                 * Show the main form but hide it behind any active windows until
+                 * loading is complete to prevent display issues.
+                 * 
+                 * @TODO ModpacksPane has a display issue with packScroll if the  
+                 * main form is not visible when constructed.
+                 */
+                instance.setVisible(true);
+                instance.toBack();
+
+                instance.eventBus.register(frame.thirdPartyPane);
+                instance.eventBus.register(frame.modPacksPane);
+                instance.eventBus.register(this);
+
+                ModPack.loadXml(getXmls());
+
+                Map.addListener(frame.mapsPane);
+                //				Map.loadAll();
+
+                TexturePack.addListener(frame.tpPane);
+                //				TexturePack.loadAll();
+
+
+                /*
+                 * Run UpdateChecker swingworker. done() will open LauncherUpdateDialog if needed
+                 */
+                UpdateChecker updateChecker = new UpdateChecker(Constants.buildNumber, minUsable, beta_) {
+                    @Override
+                    protected void done () {
+                        try {
+                            if (get()) {
+                                LauncherUpdateDialog p = new LauncherUpdateDialog(this, minUsable);
+                                p.setVisible(true);
+                            }
+                        } catch (InterruptedException e) {
+                        } catch (ExecutionException e) {
+                        }
+                    }
+                };
+                updateChecker.execute();
+                LoadingDialog.setProgress(180);
+            }
+        });
+    }
+
+    /**
      * Create the frame.
      */
-    public LaunchFrame (final int tab) {
+    public LaunchFrame(final int tab) {
         setFont(new Font("a_FuturaOrto", Font.PLAIN, 12));
-        setResizable(true);
+        setResizable(false);
         setTitle(Constants.name + " v" + Constants.version);
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
 
-        panel = new JPanel(new BorderLayout());
+        panel = new JPanel();
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-
-        int prefWidth = 850;
-        int prefHeight = 480;
-        this.setMinimumSize(new Dimension(prefWidth, prefHeight));
-
-        // Determine how much space is used by window decoration, resize accordingly
-        this.pack();
-        Dimension fullWindowSize = this.getContentPane().getSize();
-        this.setMinimumSize(new Dimension(prefWidth + (prefWidth - fullWindowSize.width), prefHeight + (prefHeight - fullWindowSize.height)));
-
-        // Center on screen
-        this.setLocationRelativeTo(null);
-
-        footer.setMinimumSize(new Dimension(850, 100));
-        footer.setLayout(new BorderLayout());
+        if (OSUtils.getCurrentOS() == OS.WINDOWS) {
+            setBounds(100, 100, 842, 480);
+        } else {
+            setBounds(100, 100, 850, 480);
+        }
+        panel.setBounds(0, 0, 850, 480);
+        panel.setLayout(null);
+        footer.setBounds(0, 380, 850, 100);
+        footer.setLayout(null);
         footer.setBackground(LauncherStyle.getCurrentStyle().footerColor);
-
-        tabbedPane.setMinimumSize(new Dimension(850, 380));
-
-        panel.add(tabbedPane, BorderLayout.CENTER);
-        panel.add(footer, BorderLayout.PAGE_END);
+        tabbedPane.setBounds(0, 0, 850, 380);
+        panel.add(tabbedPane);
+        panel.add(footer);
         setContentPane(panel);
 
         //Footer
         footerLogo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerLogo.setMinimumSize(new Dimension(42, 42));
+        footerLogo.setBounds(20, 20, 42, 42);
         footerLogo.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked (MouseEvent event) {
@@ -180,20 +450,11 @@ public class LaunchFrame extends JFrame {
         });
 
         footerCreeper.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerCreeper.setMinimumSize(new Dimension(132, 42));
+        footerCreeper.setBounds(72, 20, 132, 42);
         footerCreeper.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked (MouseEvent event) {
                 OSUtils.browse("http://billing.creeperhost.net/link.php?id=2");
-            }
-        });
-
-        footerTUG.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerTUG.setMinimumSize(new Dimension(132, 42));
-        footerTUG.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked (MouseEvent event) {
-                OSUtils.browse("http://feed-the-beast.com/tug");
             }
         });
 
@@ -211,8 +472,17 @@ public class LaunchFrame extends JFrame {
             }
         }
 
-        users.setMinimumSize(new Dimension(150, 30));
-        users.setMaximumSize(new Dimension(150, 30));
+        donate.setText(I18N.getLocaleString("DONATE_BUTTON"));
+        donate.setBounds(390, 20, 80, 30);
+        donate.setEnabled(false);
+        donate.setToolTipText("Coming Soon...");
+        donate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed (ActionEvent e) {
+            }
+        });
+
+        users.setBounds(550, 20, 150, 30);
         users.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent e) {
@@ -226,7 +496,7 @@ public class LaunchFrame extends JFrame {
         });
 
         edit.setText(I18N.getLocaleString("EDIT_BUTTON"));
-        edit.setMinimumSize(new Dimension(60, 30));
+        edit.setBounds(480, 20, 60, 30);
         edit.setVisible(true);
         edit.setEnabled(users.getSelectedIndex() > 1);
         edit.addActionListener(new ActionListener() {
@@ -242,9 +512,8 @@ public class LaunchFrame extends JFrame {
         });
 
         launch.setText(I18N.getLocaleString("LAUNCH_BUTTON"));
-        //TODO: move this or make sure doLaunch() enables it. Only visual bug.
         launch.setEnabled(false);
-        launch.setMinimumSize(new Dimension(100, 30));
+        launch.setBounds(711, 20, 100, 30);
         launch.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
@@ -252,7 +521,7 @@ public class LaunchFrame extends JFrame {
             }
         });
 
-        serverbutton.setMinimumSize(new Dimension(330, 30));
+        serverbutton.setBounds(480, 20, 330, 30);
         serverbutton.setText(I18N.getLocaleString("DOWNLOAD_SERVER_PACK"));
         serverbutton.setVisible(false);
         serverbutton.addActionListener(new ActionListener() {
@@ -261,8 +530,7 @@ public class LaunchFrame extends JFrame {
             public void actionPerformed (ActionEvent event) {
                 if (!ModPack.getSelectedPack().getServerUrl().isEmpty()) {
                     if (users.getSelectedIndex() > 1 && modPacksPane.packPanels.size() > 0) {
-                        String version = (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") || Settings.getSettings().getPackVer().equalsIgnoreCase("newest version"))
-                                ? ModPack
+                        String version = (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") || Settings.getSettings().getPackVer().equalsIgnoreCase("newest version")) ? ModPack
                                 .getSelectedPack().getVersion().replace(".", "_")
                                 : Settings.getSettings().getPackVer().replace(".", "_");
                         if (ModPack.getSelectedPack().isPrivatePack()) {
@@ -270,20 +538,19 @@ public class LaunchFrame extends JFrame {
                         } else {
                             OSUtils.browse(DownloadUtils.getCreeperhostLink("modpacks/" + ModPack.getSelectedPack().getDir() + "/" + version + "/" + ModPack.getSelectedPack().getServerUrl()));
                         }
-                        TrackerUtils.sendPageView(ModPack.getSelectedPack().getName() + "Server Download",
-                                "Server Download / " + ModPack.getSelectedPack().getName() + " / " + ModPack.getSelectedPack().getVersion());
+                        TrackerUtils.sendPageView(ModPack.getSelectedPack().getName() + " Server Download", ModPack.getSelectedPack().getName());
                     }
                 }
             }
         });
 
-        mapInstall.setMinimumSize(new Dimension(160, 30));
+        mapInstall.setBounds(650, 20, 160, 30);
         mapInstall.setText(I18N.getLocaleString("INSTALL_MAP"));
         mapInstall.setVisible(false);
         mapInstall.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
-                if (MapUtils.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
+                if (mapsPane.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
                     MapManager man = new MapManager(new JFrame(), true);
                     man.setVisible(true);
                     MapManager.cleanUp();
@@ -292,30 +559,30 @@ public class LaunchFrame extends JFrame {
         });
 
         mapInstallLocation = new JComboBox();
-        mapInstallLocation.setMinimumSize(new Dimension(160, 30));
+        mapInstallLocation.setBounds(480, 20, 160, 30);
         mapInstallLocation.setToolTipText("Install to...");
         mapInstallLocation.setVisible(false);
 
-        serverMap.setMinimumSize(new Dimension(330, 30));
+        serverMap.setBounds(480, 20, 330, 30);
         serverMap.setText(I18N.getLocaleString("DOWNLOAD_MAP_SERVER"));
         serverMap.setVisible(false);
         serverMap.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent event) {
-                if (MapUtils.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
-                    OSUtils.browse(DownloadUtils.getCreeperhostLink("maps/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getMapName() + "/"
-                            + Map.getMap(LaunchFrame.getSelectedMapIndex()).getVersion() + "/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getUrl()));
+                if (mapsPane.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
+                    OSUtils.browse(DownloadUtils.getCreeperhostLink("maps%5E" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getMapName() + "%5E"
+                            + Map.getMap(LaunchFrame.getSelectedMapIndex()).getVersion() + "%5E" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getUrl()));
                 }
             }
         });
 
-        tpInstall.setMinimumSize(new Dimension(160, 30));
+        tpInstall.setBounds(650, 20, 160, 30);
         tpInstall.setText(I18N.getLocaleString("INSTALL_TEXTUREPACK"));
         tpInstall.setVisible(false);
         tpInstall.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
-                if (TexturepackPane.texturePackPanels.size() > 0 && getSelectedTexturePackIndex() >= 0) {
+                if (tpPane.texturePackPanels.size() > 0 && getSelectedTexturePackIndex() >= 0) {
                     TextureManager man = new TextureManager(new JFrame(), true);
                     man.setVisible(true);
                 }
@@ -323,58 +590,28 @@ public class LaunchFrame extends JFrame {
         });
 
         tpInstallLocation = new JComboBox();
-        tpInstallLocation.setMinimumSize(new Dimension(160, 30));
+        tpInstallLocation.setBounds(480, 20, 160, 30);
         tpInstallLocation.setToolTipText("Install to...");
         tpInstallLocation.setVisible(false);
 
         tpInstallLocLbl.setText("Install to...");
-        tpInstallLocLbl.setMinimumSize(new Dimension(80, 30));
+        tpInstallLocLbl.setBounds(480, 20, 80, 30);
         tpInstallLocLbl.setVisible(false);
 
-        // Panel for the items in the bottom left
-        JPanel logoPanel = new JPanel();
-        logoPanel.setBackground(LauncherStyle.getCurrentStyle().footerColor);
-        logoPanel.add(footerLogo);
-        logoPanel.add(footerCreeper);
-        logoPanel.add(footerTUG);
-
-        // Panel for the items in the bottom right
-        JPanel buttonFooterPanel = new JPanel();
-        buttonFooterPanel.setLayout(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-        buttonFooterPanel.setBackground(LauncherStyle.getCurrentStyle().footerColor);
-        buttonFooterPanel.add(edit);
-        buttonFooterPanel.add(users);
-        buttonFooterPanel.add(launch);
-
-        // Buttons for texture pack pane
-        buttonFooterPanel.add(tpInstallLocation);
-        buttonFooterPanel.add(tpInstall);
-
-        // Buttons for custom map pane
-        buttonFooterPanel.add(mapInstallLocation);
-        buttonFooterPanel.add(mapInstall);
-
-        // Button if server map
-        buttonFooterPanel.add(serverMap);
-
-        footer.add(logoPanel, BorderLayout.LINE_START);
-        footer.add(buttonFooterPanel, BorderLayout.LINE_END);
+        footer.add(edit);
+        footer.add(users);
+        footer.add(footerLogo);
+        footer.add(footerCreeper);
+        footer.add(launch);
+        footer.add(donate);
+        footer.add(serverbutton);
+        footer.add(mapInstall);
+        footer.add(mapInstallLocation);
+        footer.add(serverMap);
+        footer.add(tpInstall);
+        footer.add(tpInstallLocation);
 
         newsPane = new NewsPane();
-        NewsWorker nw = new NewsWorker() {
-            @Override
-            protected void done () {
-                String html = null;
-                try {
-                    html = get();
-                }
-                catch (InterruptedException e) { }
-                catch (ExecutionException e) { }
-
-                newsPane.setContent(html);
-            }
-        };
-        nw.execute();
         modPacksPane = new FTBPacksPane();
         thirdPartyPane = new ThirdPartyPane();
         mapsPane = new MapUtils();
@@ -389,7 +626,6 @@ public class LaunchFrame extends JFrame {
         tabbedPane.add(modPacksPane, 2);
         tabbedPane.add(thirdPartyPane, 3);
         tabbedPane.add(tpPane, 4);
-
         /*
          * TODO: This will block. Network.
          */
@@ -418,44 +654,25 @@ public class LaunchFrame extends JFrame {
             }
         });
         tabbedPane.setSelectedIndex(tab);
-
-        panel.addComponentListener(new ComponentAdapter() {
-            // Reset splitter on window resize to avoid being in an unreachable location
-            @Override
-            public void componentResized (ComponentEvent arg0) {
-                modPacksPane.getSplitPane().resetToPreferredSizes();
-                thirdPartyPane.getSplitPane().resetToPreferredSizes();
-                tpPane.getSplitPane().resetToPreferredSizes();
-                mapsPane.getSplitPane().resetToPreferredSizes();
-            }
-        });
-
     }
 
     public static void checkDoneLoading () {
-        int callCount = checkDoneLoadingCallCount.incrementAndGet();
-        if (callCount == 1) {
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run () {
-                    LoadingDialog.advance("Opening main window");
-                    instance.setVisible(true);
-                    instance.toFront();
-                    //TODO: add checks if loader is disabled
-                    loader.setVisible(false);
-                    loader.dispose();
-                    Benchmark.logBenchAs("main", "Launcher Startup(main window opened and ready to use)");
-                    String packDir = CommandLineSettings.getSettings().getPackDir();
-                    if (packDir != null) {
-                        ModPack.setSelectedPack(packDir);
-                        LaunchFrame.getInstance().doLaunch();
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run () {
+                if (FTBPacksPane.getInstance().loaded) {
+                    LoadingDialog.setProgress(190);
+                    if (MapUtils.loaded) {
+                        LoadingDialog.setProgress(200);
+                        if (TexturepackPane.loaded) {
+                            loader.setVisible(false);
+                            instance.setVisible(true);
+                            instance.toFront();
+                            Benchmark.logBenchAs("main", "Launcher Startup");
+                        }
                     }
                 }
-            });
-            Benchmark.logBenchAs("main", "Launcher Startup(Modpacks loaded)");
-        }
-        if (callCount == 2) {
-            Benchmark.logBenchAs("main", "Launcher Startup(maps and texturepacks loaded)");
-        }
+            }
+        });
     }
 
     public void setNewsIcon () {
@@ -485,7 +702,7 @@ public class LaunchFrame extends JFrame {
     /**
      * call this to login
      */
-    private void doLogin (final String username, String password, String mojangData, String selectedProfile) {
+    private void doLogin (final String username, String password, String mojangData) {
         if (ModPack.getSelectedPack().getDisclaimer() != null && !ModPack.getSelectedPack().getDisclaimer().isEmpty()) {
             ErrorUtils.tossError(ModPack.getSelectedPack().getDisclaimer());
         }
@@ -519,7 +736,7 @@ public class LaunchFrame extends JFrame {
         tpInstall.setEnabled(false);
         tpInstallLocation.setEnabled(false);
 
-        LoginWorker loginWorker = new LoginWorker(username, password, mojangData, selectedProfile) {
+        LoginWorker loginWorker = new LoginWorker(username, password, mojangData) {
             @Override
             public void done () {
                 String responseStr;
@@ -547,7 +764,7 @@ public class LaunchFrame extends JFrame {
                     Logger.logInfo("Login complete.");
                     try {
                         // save userdata, including new mojangData
-                        Main.getUserManager().write();
+                        userManager.write();
                         Logger.logDebug("user data saved");
                     } catch (IOException e) {
                         Logger.logError("logindata saving failed!");
@@ -609,9 +826,9 @@ public class LaunchFrame extends JFrame {
                 try {
                     File destination = new File(OSUtils.getCacheStorageLocation(), "backups" + File.separator + pack.getDir() + File.separator + "config_backup");
                     if (destination.exists()) {
-                        FTBFileUtils.delete(destination);
+                        FileUtils.delete(destination);
                     }
-                    FTBFileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + File.separator + "minecraft" + File.separator + "config"), destination);
+                    FileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + File.separator + "minecraft" + File.separator + "config"), destination);
                 } catch (IOException e) {
                     Logger.logError("Error while doing backups", e);
                 }
@@ -635,6 +852,7 @@ public class LaunchFrame extends JFrame {
         MCInstaller.setupNewStyle(installPath, pack, isLegacy, RESPONSE);
     }
 
+
     /**
      * "Saves" the settings from the GUI controls into the settings class.
      */
@@ -648,7 +866,7 @@ public class LaunchFrame extends JFrame {
      */
     public static void writeUsers (String user) {
         try {
-            Main.getUserManager().write();
+            userManager.write();
         } catch (IOException e) {
         }
         ArrayList<String> var = UserManager.getNames();
@@ -670,12 +888,12 @@ public class LaunchFrame extends JFrame {
         tpInstallLocation.removeAllItems();
         for (String location : locations) {
             if (location != null && !location.isEmpty()) {
-                tpInstallLocation.addItem(ModPack.getPack(location.trim()).getNameWithVersion());
+                tpInstallLocation.addItem(ModPack.getPack(location.trim()).getName());
             }
         }
         //TODO:
         // Decide later if we want to do this? How to handle selection from two modpack panes?
-        tpInstallLocation.setSelectedItem(ModPack.getSelectedPack(true).getNameWithVersion());
+        tpInstallLocation.setSelectedItem(ModPack.getSelectedPack(true).getName());
     }
 
     /**
@@ -695,14 +913,14 @@ public class LaunchFrame extends JFrame {
      * @return - Outputs selected map index
      */
     public static int getSelectedMapIndex () {
-        return MapUtils.getSelectedMapIndex();
+        return instance.mapsPane.getSelectedMapIndex();
     }
 
     /**
      * @return - Outputs selected texturepack index
      */
     public static int getSelectedTexturePackIndex () {
-        return TexturepackPane.getSelectedTexturePackIndex();
+        return instance.tpPane.getSelectedTexturePackIndex();
     }
 
     /**
@@ -741,12 +959,10 @@ public class LaunchFrame extends JFrame {
         tpInstallLocation.setEnabled(true);
         TextureManager.updating = false;
     }
-
     @Subscribe
-    private void handleEnableObjectsEvent (EnableObjectsEvent e) {
+    private void handleEnableObjectsEvent(EnableObjectsEvent e){
         enableObjects();
     }
-
     /**
      * Download and install mods
      * @return boolean - represents whether it was successful in initializing mods
@@ -758,18 +974,17 @@ public class LaunchFrame extends JFrame {
         man.setVisible(true);
         while (man == null) {
         }
-        while (!ModManager.worker.isDone()) {
+        while (!man.worker.isDone()) {
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException ignored) {
-            }
+            } catch (InterruptedException ignored) { }
         }
-        if (ModManager.erroneous) {
+        if (man.erroneous) {
             return false;
         }
         try {
             MCInstaller.installMods(ModPack.getSelectedPack().getDir());
-            ModManager.cleanUp();
+            man.cleanUp();
         } catch (IOException e) {
             Logger.logDebug("Exception: ", e);
         }
@@ -816,7 +1031,7 @@ public class LaunchFrame extends JFrame {
                 disableMainButtons();
                 disableMapButtons();
             } else {
-                result = MapUtils.type.equals("Server");
+                result = mapsPane.type.equals("Server");
                 mapInstall.setVisible(!result);
                 mapInstallLocation.setVisible(!result);
                 serverMap.setVisible(result);
@@ -838,17 +1053,34 @@ public class LaunchFrame extends JFrame {
     }
 
     // TODO: Make buttons dynamically sized.
-
     /**
      * updates the buttons/text to language specific
      */
     public void updateLocale () {
+        if (I18N.currentLocale == Locale.deDE) {
+            edit.setBounds(420, 20, 120, 30);
+            donate.setBounds(330, 20, 80, 30);
+            mapInstall.setBounds(620, 20, 190, 30);
+            mapInstallLocation.setBounds(420, 20, 190, 30);
+            serverbutton.setBounds(420, 20, 390, 30);
+            tpInstallLocation.setBounds(420, 20, 190, 30);
+            tpInstall.setBounds(620, 20, 190, 30);
+        } else {
+            edit.setBounds(480, 20, 60, 30);
+            donate.setBounds(390, 20, 80, 30);
+            mapInstall.setBounds(650, 20, 160, 30);
+            mapInstallLocation.setBounds(480, 20, 160, 30);
+            serverbutton.setBounds(480, 20, 330, 30);
+            tpInstallLocation.setBounds(480, 20, 160, 30);
+            tpInstall.setBounds(650, 20, 160, 30);
+        }
         launch.setText(I18N.getLocaleString("LAUNCH_BUTTON"));
         edit.setText(I18N.getLocaleString("EDIT_BUTTON"));
         serverbutton.setText(I18N.getLocaleString("DOWNLOAD_SERVER_PACK"));
         mapInstall.setText(I18N.getLocaleString("INSTALL_MAP"));
         serverMap.setText(I18N.getLocaleString("DOWNLOAD_MAP_SERVER"));
         tpInstall.setText(I18N.getLocaleString("INSTALL_TEXTUREPACK"));
+        donate.setText(I18N.getLocaleString("DONATE_BUTTON"));
         dropdown_[0] = I18N.getLocaleString("PROFILE_SELECT");
         dropdown_[1] = I18N.getLocaleString("PROFILE_CREATE");
         optionsPane.updateLocale();
@@ -856,43 +1088,52 @@ public class LaunchFrame extends JFrame {
         thirdPartyPane.updateLocale();
         mapsPane.updateLocale();
         tpPane.updateLocale();
-        if (trayMenu != null) {
-            trayMenu.updateLocale();
+        if(trayMenu != null) {
+        	trayMenu.updateLocale();
         }
+    }
+
+    private static ArrayList<String> getXmls () {
+        ArrayList<String> s = Settings.getSettings().getPrivatePacks();
+        if (s == null) {
+            s = new ArrayList<String>();
+        }
+        for (int i = 0; i < s.size(); i++) {
+            if (s.get(i).isEmpty()) {
+                s.remove(i);
+                i--;
+            } else {
+                String temp = s.get(i);
+                if (!temp.endsWith(".xml")) {
+                    s.remove(i);
+                    s.add(i, temp + ".xml");
+                }
+            }
+        }
+        s.add(0, "modpacks.xml");
+        s.add(1, "thirdparty.xml");
+        return s;
     }
 
     public void doLaunch () {
         JavaInfo java = Settings.getSettings().getCurrentJava();
-        ModPack pack = ModPack.getSelectedPack();
-        // check launcher version
-        if (ModPack.getSelectedPack().getMinLaunchSpec() > Constants.buildNumber) {
-            ErrorUtils.tossError("Please update your launcher in order to launch this pack! This can be done by restarting your launcher, an update dialog will pop up.");
-            return;
-        }
-
-        // check if user profile is selected
-        if (users.getSelectedIndex() <= 1) {
-            if (UserManager._users.size() == 0) {
-                ProfileAdderDialog p = new ProfileAdderDialog(getInstance(), true);
-                p.setVisible(true);
-            } else {
+        int[] minSup = ModPack.getSelectedPack().getMinJRE();
+        if (ModPack.getSelectedPack().getMinLaunchSpec() <= Constants.buildNumber) {
+            if (users.getSelectedIndex() > 1 && ModPack.getSelectedPack() != null) {
+                if (minSup.length >= 2 && minSup[0] <= java.getMajor() && minSup[1] <= java.getMinor()) {
+                    Settings.getSettings().setLastFTBPack(ModPack.getSelectedPack(true).getDir());
+                    Settings.getSettings().setLastThirdPartyPack(ModPack.getSelectedPack(false).getDir());
+                    saveSettings();
+                    doLogin(UserManager.getUsername(users.getSelectedItem().toString()), UserManager.getPassword(users.getSelectedItem().toString()),
+                            UserManager.getMojangData(users.getSelectedItem().toString()));
+                } else {//user can't run pack-- JRE not high enough
+                    ErrorUtils.tossError("You must use at least java " + minSup[0] + "." + minSup[1] + " to play this pack! Please go to Options to get a link or Advanced Options enter a path.", java.toString());
+                }
+            } else if (users.getSelectedIndex() <= 1) {
                 ErrorUtils.tossError("Please select a profile!");
-                return;
             }
-        }
-
-        // check selected java is at least version specified in pack's XML
-        JavaVersion minSup = JavaVersion.createJavaVersion(pack.getMinJRE());
-        if (minSup.isOlder(java) || minSup.isSameVersion(java)) {
-            Settings.getSettings().setLastFTBPack(ModPack.getSelectedPack(true).getDir());
-            Settings.getSettings().setLastThirdPartyPack(ModPack.getSelectedPack(false).getDir());
-            saveSettings();
-            doLogin(UserManager.getUsername(users.getSelectedItem().toString()), UserManager.getPassword(users.getSelectedItem().toString()),
-                    UserManager.getMojangData(users.getSelectedItem().toString()), UserManager.getName(users.getSelectedItem().toString()));
-        } else {//user can't run pack-- JRE not high enough
-            ErrorUtils.tossError("You must use at least java " + pack.getMinJRE() + " to play this pack! Please go to Options to get a link or Advanced Options enter a path.",
-                    java.toString());
-            return;
+        } else {
+            ErrorUtils.tossError("Please update your launcher in order to launch this pack! This can be done by restarting your launcher, an update dialog will pop up.");
         }
     }
 
@@ -914,24 +1155,20 @@ public class LaunchFrame extends JFrame {
         }
     }
 
-    public static void setUpSystemTray () {
-        trayMenu = new TrayMenu();
-
-        SystemTray tray = SystemTray.getSystemTray();
-        TrayIcon trayIcon = new TrayIcon(Toolkit.getDefaultToolkit().getImage(instance.getClass().getResource("/image/logo_ftb.png")));
-
-        trayIcon.setPopupMenu(trayMenu);
-        trayIcon.setToolTip(Constants.name);
-        trayIcon.setImageAutoSize(true);
-
-        try {
-            tray.add(trayIcon);
-        } catch (AWTException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void main (String args[]) {
-        Main.main(args);// just in case someone is launching w/ this as the main class
+    private static void setUpSystemTray() {
+    	trayMenu = new TrayMenu();
+    	
+    	SystemTray tray = SystemTray.getSystemTray();
+    	TrayIcon trayIcon = new TrayIcon(Toolkit.getDefaultToolkit().getImage(instance.getClass().getResource("/image/logo_ftb.png")));
+    	
+    	trayIcon.setPopupMenu(trayMenu);
+    	trayIcon.setToolTip(Constants.name);
+    	trayIcon.setImageAutoSize(true);
+    	
+    	try {
+			tray.add(trayIcon);
+		} catch (AWTException e) {
+			e.printStackTrace();
+		}
     }
 }

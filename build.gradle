@@ -1,5 +1,9 @@
 buildscript {
     repositories {
+		maven {
+            name 'Shadow'
+            url 'http://dl.bintray.com/content/johnrengelman/gradle-plugins'
+        }
         maven {
             name = 'ForgeFS'
             url = 'http://files.minecraftforge.net/maven'
@@ -8,80 +12,48 @@ buildscript {
             name = "sonatype"
             url = "https://oss.sonatype.org/content/repositories/snapshots/"
         }
-        jcenter()
+		maven {
+            name = "jcenter"
+            url = "http://jcenter.bintray.com"
+        }
         mavenCentral()
         mavenLocal()
     }
 
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:0.8'
         classpath 'net.minecraftforge.gradle:ForgeGradle:1.1-SNAPSHOT'
 		classpath 'edu.sc.seis.gradle:macappbundle:2.0.0'
     }
+
 }
 
 apply plugin: 'maven'
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-apply plugin: 'application'
-apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'shadow'
 apply plugin: 'launch4j'
-apply plugin: 'macAppBundle'
-
-configurations {
-    deployerJars
-}
-
-repositories {
-	mavenCentral()
-	maven {
-		name = 'Mojang libs'
-		url = 'https://libraries.minecraft.net/'
-	}
-}
-
-dependencies {
-    compile 'org.swinglabs.swingx:swingx-all:1.6.4'
-	compile 'com.miglayout:miglayout-swing:4.2'
-	compile 'com.google.code.gson:gson:2.3.1'
-	compile 'com.mojang:authlib:1.5.17'
-    compile 'org.apache.logging.log4j:log4j-api:2.0-beta9'
-	compile 'org.apache.logging.log4j:log4j-core:2.0-beta9'
-	compile 'org.projectlombok:lombok:1.12.6'
-	compile 'com.google.guava:guava:18.0'
-    compile 'com.beust:jcommander:1.30'
-    compile 'com.google.code.findbugs:jsr305:1.3.9'//nonnull annotations
-    compile 'org.tukaani:xz:1.5' // LZMA support
-    //commons lang3 via authlib
-    //commons io via authlib
-    testCompile 'junit:junit:4.10'
-    // something depends mockito-all => core not needed
-    //testCompile 'org.mockito:mockito-core:1.+'
-    testCompile 'org.powermock:powermock-module-junit4:1.6.0'
-    testCompile 'org.powermock:powermock-api-mockito:1.6.0'
-    testCompile 'org.powermock:powermock-module-junit4-rule-agent:1.6.0'
-	deployerJars 'org.apache.maven.wagon:wagon-ftp:2.2'
-}
+apply plugin: 'application'
 
 project.ext {
-    mainClass = 'net.ftb.main.Main'
+    mainClass = 'net.ftb.gui.LaunchFrame'
     currentYear = '2014'
 }
-if (System.getenv().BUILD_NUMBER != null) {
-    ext.buildNum = System.getenv().BUILD_NUMBER
-} else {
-    ext.buildNum = "9999999"
-}
+    if (System.getenv().BUILD_NUMBER != null) {
+        ext.buildNum = System.getenv().BUILD_NUMBER
+    } else {
+        ext.buildNum = "9999999"
+    }
 
 processResources {
     inputs.property "LauncherJenkins", project.buildNum
-    inputs.property "GitSHA", project.getCheckedOutGitCommitHash()
+    inputs.property "GitSHA", project.gitSha()
     from(sourceSets.main.resources.srcDirs) {
         include '**/*.properties'
-        expand 'LauncherJenkins':project.buildNum, 'GitSHA':project.getCheckedOutGitCommitHash()
+        expand 'LauncherJenkins':project.buildNum, 'GitSHA':project.gitSha()
     }
-    // copy everything else, thats not text
+        // copy everything else, thats not text
     from(sourceSets.main.resources.srcDirs) {
         exclude '**/*.properties'
     }
@@ -89,37 +61,58 @@ processResources {
 }
 mainClassName = project.mainClass
 group = 'net.ftb'
-version = "1.4.5-${project.buildNum}"
+version = "1.4.3-${project.buildNum}"
 description = "FTB Launcher"
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
-shadowJar  {
+shadow {
     exclude 'META-INF/*.DSA'
     exclude 'META-INF/*.RSA'
-  dependencies {
-    exclude(dependency('com.mojang:authlib'))
-    exclude(dependency('org.projectlombok:lombok'))
-  }
-  classifier = ''
-}
-task copyMainJar(type: Copy) {
-    from("${buildDir}/libs/")
-	destinationDir = file("${buildDir}/macApp/Feed The Beast.app/Contents/Java")
-	rename { String fileName ->
-        fileName.replace("-${version}", '')
+	//classifier = "${System.getenv().BUILD_NUMBER}"
+	destinationDir = "${buildDir}/libs/"
+	artifactSet {
+        include 'com.google.code.gson'
+		include 'com.google.guava'
+		include 'org.apache.logging.log4j'
+		include 'commons-io'
+		include 'org.apache.commons'
+		include 'commons-codec'
     }
-	rename(/(.+)-${version}(.+)/, '$1$2')
-
 }
+
+
+task deleteOrig(type: Delete) {
+    delete "${project.tasks.jar.getArchivePath().getPath()}"
+}
+
+task fixJars(type: Copy) {
+
+    from("${buildDir}/libs/")
+	destinationDir = file("${buildDir}/libs/")
+        rename { String fileName ->
+            fileName.replace('-shadow', '')
+        }
+		rename(/(.+)-shadow(.+)/, '$1$2')
+}
+task deleteShadow(type: Delete) {
+    delete "${project.tasks.jar.getArchivePath().getPath().replace('.jar', '-shadow.jar')}"
+
+	}
+task zipApp(type: Zip) {
+    from "${project.buildDir}/macApp/"
+    destinationDir = file("${project.buildDir}/libs")
+    classifier = 'app'
+}
+apply plugin: 'macAppBundle'
 
 assemble.dependsOn.remove(createDmg)
 build.dependsOn.remove(createDmg)
-createApp.dependsOn.remove(copyToResourcesJava)
-//build.dependsOn(zipApp)
-//zipApp.dependsOn(createApp)
-build.dependsOn(createAppZip)
-createApp.dependsOn(copyMainJar)
-copyMainJar.dependsOn(shadowJar)
+build.dependsOn(zipApp)
+zipApp.dependsOn(createApp)
+createApp.dependsOn(deleteShadow)
+deleteShadow.dependsOn(fixJars)
+fixJars.dependsOn(deleteOrig)
+deleteOrig.dependsOn(shadowJar)
 
 afterEvaluate {
 	launch4j {
@@ -132,10 +125,9 @@ afterEvaluate {
 }
 
 artifacts {
-    archives file(project.tasks.jar.getArchivePath().getPath().replace(".jar", ".exe"))
-    archives file(project.tasks.jar.getArchivePath().getPath().replace(".jar", ".zip").replace("libs", "distributions"))
-}
-
+ archives file(project.tasks.jar.getArchivePath().getPath().replace(".jar", ".exe"))
+ archives file(project.tasks.jar.getArchivePath().getPath().replace(".jar", "-app.zip"))
+ }
 macAppBundle {
     mainClassName = project.mainClass
     appName = "Feed The Beast"
@@ -150,42 +142,54 @@ jar {
     }
 }
 
-def getCheckedOutGitCommitHash() {
-    def gitFolder = "$projectDir" + File.separator + ".git" + File.separator
-    def takeFromHash = 12
-    /*
-     * '.git/HEAD' contains either
-     * in case of detached head: the currently checked out commit hash
-     * otherwise: a reference to a file containing the current commit hash
-     */
-    def head = new File(gitFolder + "HEAD").text.split(":") // .git/HEAD
-    def isCommit = head.length == 1 // e5a7c79edabbf7dd39888442df081b1c9d8e88fd
-    // def isRef = head.length > 1 // ref: refs/heads/master
-
-    if(isCommit) return head[0].trim().take(takeFromHash) // e5a7c79edabb
-
-    def refHead = new File(gitFolder + head[1].trim()) // .git/refs/heads/master
-    refHead.text.trim().take takeFromHash
+configurations {
+    deployerJars
 }
 
-if (project.hasProperty("local_maven")) {
-	apply plugin: 'maven'
-        uploadArchives {
-            repositories {
-                mavenDeployer {
-                    repository(url: "file://${local_maven}")
+repositories {
+	mavenCentral()
+	maven {
+			name = 'Mojang libs'
+			url = 'https://libraries.minecraft.net/'
+		}
+}
+dependencies {
+    compile 'org.swinglabs.swingx:swingx-all:1.6.4'
+	compile 'com.google.code.gson:gson:2.2.4'
+	compile 'com.mojang:authlib:1.5.13'
+    compile 'org.apache.logging.log4j:log4j-api:2.0-beta9'
+	compile 'org.apache.logging.log4j:log4j-core:2.0-beta9'
+	compile 'org.projectlombok:lombok:1.12.6'
+	compile 'com.google.guava:guava:16.0'
+	//commons lang3 via authlib
+    //commons io via authlib
+    testCompile 'junit:junit:4.10'
+	deployerJars 'org.apache.maven.wagon:wagon-ftp:2.2'
+
+}
+
+def gitSha() {
+    return 'git rev-parse HEAD'.execute().text.trim()
+}
+
+    if (project.hasProperty("local_maven")) {
+	    apply plugin: 'maven'
+            uploadArchives {
+                repositories {
+                    mavenDeployer {
+                        repository(url: "file://${local_maven}")
+                }
             }
         }
     }
-}
-if (project.hasProperty("remote_maven")) {
-	apply plugin: 'maven'
-    uploadArchives {
+    if (project.hasProperty("remote_maven")) {
+	    apply plugin: 'maven'
+            uploadArchives {
 		repositories.mavenDeployer {
-            configuration = configurations.deployerJars
-            repository(url: "ftp://${remote_maven}") {
-                authentication(userName: "${ftp_username}", password: "${ftp_pass}")
-            }
+        configuration = configurations.deployerJars
+        repository(url: "ftp://${remote_maven}") {
+            authentication(userName: "${ftp_username}", password: "${ftp_pass}")
         }
     }
-}
+        }
+    }

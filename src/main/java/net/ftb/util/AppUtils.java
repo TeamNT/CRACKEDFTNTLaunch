@@ -16,10 +16,6 @@
  */
 package net.ftb.util;
 
-import net.ftb.log.Logger;
-import org.w3c.dom.Document;
-import org.xml.sax.SAXException;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -28,6 +24,11 @@ import java.util.Scanner;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+
+import net.ftb.log.Logger;
+
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
 
 public class AppUtils {
     /**
@@ -38,6 +39,10 @@ public class AppUtils {
     public static String readString (InputStream stream) {
         Scanner scanner = new Scanner(stream).useDelimiter("\\A");
         return scanner.hasNext() ? scanner.next() : "";
+    }
+    
+    public static String downloadString (URL url) throws IOException {
+        return readString(url.openStream());
     }
 
     /**

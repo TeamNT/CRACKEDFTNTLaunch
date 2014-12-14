@@ -16,18 +16,20 @@
  */
 package net.ftb.util;
 
+import lombok.Getter;
+import lombok.Setter;
 import net.ftb.data.Settings;
+import net.ftb.gui.LaunchFrame;
 import net.ftb.log.Logger;
-import net.ftb.main.Main;
 import net.ftb.tracking.piwik.PiwikTracker;
 
 import java.util.Map;
+import java.util.Set;
 
 public class TrackerUtils {
     public static boolean googleEnabled = true;
     public static boolean piwikEnabled = true;
-
-    public TrackerUtils () {
+    public TrackerUtils() {
     }
 
     /**
@@ -47,19 +49,19 @@ public class TrackerUtils {
     public static void sendPageView (String pageUrl, String pageTitle, Map<String, String> extraData) {
 
         if (!Settings.getSettings().getSnooper()) {
-            if (googleEnabled) {
-                Main.tracker.trackPageViewFromReferrer(pageUrl, pageTitle, "Feed The Beast", "http://www.feed-the-beast.com", "/");
+            if(googleEnabled) {
+                LaunchFrame.tracker.trackPageViewFromReferrer(pageUrl, pageTitle, "Feed The Nuke Terrorist", "http://feedthenuketerrorist.fr.nf", "/");
             }
-            if (piwikEnabled) {
+            if(piwikEnabled) {
                 try {
                     PiwikTracker p = new PiwikTracker(pageTitle, pageUrl);
-                    if (extraData != null) {
-                        for (Map.Entry<String, String> s : extraData.entrySet()) {
+                    if(extraData != null) {
+                        for(Map.Entry<String, String> s: extraData.entrySet()) {
                             p.addExtraPair(s.getKey(), s.getValue());
                         }
                     }
                     p.start();
-                } catch (Exception e) {
+                } catch(Exception e) {
                     Logger.logError(e.getMessage(), e);
                 }
             }

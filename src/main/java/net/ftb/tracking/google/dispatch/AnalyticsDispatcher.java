@@ -16,16 +16,16 @@
  */
 package net.ftb.tracking.google.dispatch;
 
-import net.ftb.log.Logger;
-
 import java.net.URI;
+
+import net.ftb.log.Logger;
 
 public abstract class AnalyticsDispatcher {
     private String userAgent;
     private String host;
     private int port;
 
-    public AnalyticsDispatcher (String userAgent, String host, int port) {
+    public AnalyticsDispatcher(String userAgent, String host, int port) {
         this.userAgent = userAgent;
         this.host = host;
         this.port = port;

@@ -16,13 +16,14 @@
  */
 package net.ftb.data;
 
-import net.ftb.log.Logger;
-import net.ftb.util.CryptoUtils;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+
+import net.ftb.log.Logger;
+import net.ftb.util.CryptoUtils;
+import net.ftb.util.OSUtils;
 
 public class User implements Serializable {
     /**
@@ -40,7 +41,7 @@ public class User implements Serializable {
      * @param password - the password of the profile
      * @param name - the name of the profile
      */
-    public User (String username, String password, String name) {
+    public User(String username, String password, String name) {
         _serial = serialVersionUID;
         setUsername(username);
         setPassword(password);
@@ -51,7 +52,7 @@ public class User implements Serializable {
      * @param input - text with username, password, name, encrypted mojang datastore
      */
     @Deprecated
-    public User (String input) {
+    public User(String input) {
         _serial = serialVersionUID;
         String[] tokens = input.split(":");
         setName(tokens[0]);
@@ -100,7 +101,7 @@ public class User implements Serializable {
         if (_decryptedStore == null || _decryptedStore.isEmpty()) {
             _encryptedStore = "";
         } else {
-            _encryptedStore = CryptoUtils.encrypt(_decryptedStore);
+            _encryptedStore = CryptoUtils.encrypt(_decryptedStore, OSUtils.getMacAddress());
         }
     }
 
@@ -112,7 +113,7 @@ public class User implements Serializable {
         if (_password == null || _password.isEmpty()) {
             _encryptedPassword = "";
         } else {
-            _encryptedPassword = CryptoUtils.encrypt(_password);
+            _encryptedPassword = CryptoUtils.encrypt(_password, OSUtils.getMacAddress());
         }
     }
 
@@ -132,49 +133,31 @@ public class User implements Serializable {
 
     private void readObject (ObjectInputStream s) throws IOException, ClassNotFoundException {
         s.defaultReadObject();
-        String password;
-        switch (_serial) {
-        case 0:
-            //_serial not found by defaultReadObject()
-            // TODO: legacy code remove later
-            if (serialVersionUID == 1) {
-                Logger.logDebug("serialVersionUID == 1");
-                // convert old stored password to new format
-                if (!_encryptedPassword.isEmpty()) {
-                    Logger.logInfo("Password is being converted to a newer format, ignore following decryption error");
-                    Logger.logInfo("Converted password will be saved to disk after successful login");
-                    password = CryptoUtils.decrypt(_encryptedPassword);
-                    _encryptedPassword = CryptoUtils.encrypt(password);
+        switch(_serial) {
+            case 0:
+                //_serial not found by defaultReadObject()
+                if (serialVersionUID == 1) {
+                    // convert old stored password to new format
+                    if (!_encryptedPassword.isEmpty()) {
+                        Logger.logInfo("Password is being converted to a newer format, ignore following decryption error");
+                        Logger.logInfo("Converted password will be saved to disk after successful login");
+                        String password =  CryptoUtils.decrypt(_encryptedPassword, OSUtils.getMacAddress());
+                        _encryptedPassword =  CryptoUtils.encrypt(password, OSUtils.getMacAddress());
+                    }
+                    _serial = 1;
                 }
-                _serial = 1;
-            }
-            break;
-        case 1:
-            if (!_encryptedPassword.isEmpty()) {
-                Logger.logInfo("Password is now encrypted with new key");
-                Logger.logInfo("Converted password will be saved to disk after successful login");
-                password = CryptoUtils.decrypt(_encryptedPassword);
-                _encryptedPassword = CryptoUtils.encrypt(password);
-            }
-            if (_encryptedStore != null && !_encryptedStore.isEmpty()) {
-                Logger.logInfo("mojang token is now encrypted with new key");
-                Logger.logInfo("Converted token will be saved to disk after successful login");
-                _decryptedStore = CryptoUtils.decrypt(_encryptedStore);
-                _encryptedStore = CryptoUtils.encrypt(_decryptedStore);
-            }
-            _serial = 2;
-            break;
-        default:
-            break;
+                break;
+            default:
+                break;
         }
 
         if (!_encryptedPassword.isEmpty()) {
-            _password = CryptoUtils.decrypt(_encryptedPassword);
+            _password = CryptoUtils.decrypt(_encryptedPassword, OSUtils.getMacAddress());
         } else {
             _password = "";
         }
         if (_encryptedStore != null && !_encryptedStore.isEmpty()) {
-            _decryptedStore = CryptoUtils.decrypt(_encryptedStore);
+            _decryptedStore = CryptoUtils.decrypt(_encryptedStore, OSUtils.getMacAddress());
         } else {
             _decryptedStore = null;
         }
@@ -183,7 +166,7 @@ public class User implements Serializable {
     private void writeObject (ObjectOutputStream s) {
         // clear mojangData if needed and then ...
         Logger.logDebug("starting...");
-        if (!saveMojangData) {
+        if (saveMojangData == false) {
             Logger.logDebug("Clearing mojangData");
             _encryptedStore = "";
         }

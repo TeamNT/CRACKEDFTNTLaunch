@@ -16,16 +16,9 @@
  */
 package net.ftb.data;
 
-import lombok.Getter;
-import lombok.Setter;
-import net.ftb.log.Logger;
-import net.ftb.util.ErrorUtils;
-import net.ftb.util.OSUtils;
-import net.ftb.util.OSUtils.OS;
-import net.ftb.util.winreg.JavaFinder;
-import net.ftb.util.winreg.JavaInfo;
-
-import java.awt.*;
+import java.awt.Dimension;
+import java.awt.Frame;
+import java.awt.Point;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -42,6 +35,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
+import lombok.Getter;
+import lombok.Setter;
+import net.ftb.gui.LaunchFrame;
+import net.ftb.log.Logger;
+import net.ftb.util.ErrorUtils;
+import net.ftb.util.OSUtils;
+import net.ftb.util.OSUtils.OS;
+import net.ftb.util.winreg.JavaFinder;
+import net.ftb.util.winreg.JavaInfo;
+
 @SuppressWarnings("serial")
 public class Settings extends Properties {
     @Getter
@@ -52,8 +55,6 @@ public class Settings extends Properties {
     @Getter
     @Setter
     private boolean forceUpdateEnabled = false;
-    @Getter
-    private boolean noConfig = false;
 
     static {
         try {
@@ -63,12 +64,12 @@ public class Settings extends Properties {
         }
     }
 
-    public Settings (File file) throws IOException {
+    public Settings(File file) throws IOException {
         configFile = file;
         if (file.exists()) {
             load(new FileInputStream(file));
         } else {
-            noConfig = true;
+            LaunchFrame.noConfig = true;
         }
     }
 
@@ -84,12 +85,9 @@ public class Settings extends Properties {
 
     public String getRamMax () {
         if (getCurrentJava().is64bits && OSUtils.getOSTotalMemory() > 6144)//6gb or more default to 2gb of ram for MC
-        {
             return getProperty("ramMax", Integer.toString(2048));
-        } else if (getCurrentJava().is64bits)//on 64 bit java default to 1.5gb newer pack's need more than a gig
-        {
+        else if (getCurrentJava().is64bits)//on 64 bit java default to 1.5gb newer pack's need more than a gig
             return getProperty("ramMax", Integer.toString(1536));
-        }
         return getProperty("ramMax", Integer.toString(1024));
     }
 
@@ -106,12 +104,7 @@ public class Settings extends Properties {
     }
 
     public String getInstallPath () {
-        String commandLinePath = CommandLineSettings.getSettings().getInstallDir();
-        if (commandLinePath != null && !commandLinePath.isEmpty()) {
-            return commandLinePath;
-        } else {
-            return getProperty("installPath", OSUtils.getDefInstallPath());
-        }
+        return getProperty("installPath", OSUtils.getDefInstallPath());
     }
 
     public void setInstallPath (String path) {
@@ -136,25 +129,23 @@ public class Settings extends Properties {
 
     public String getJavaPath () {
         String javaPath = getProperty("javaPath", null);
-        if (javaPath == null || !new File(javaPath).isFile()) {
+        if (javaPath == null || !new File(javaPath).isFile())
             remove("javaPath");
-        }
 
         javaPath = getProperty("javaPath", getDefaultJavaPath());
-        if (javaPath == null || !new File(javaPath).isFile()) {
+        if (javaPath == null || !new File(javaPath).isFile())
             ErrorUtils.tossError("Unable to find java; point to java executable file in Advanced Options or game will fail to launch.");
-        }
         return javaPath;
     }
 
     /**
-     * Returns user selected or automatically selected JVM's
-     * JavaInfo object.
-     */
+    * Returns user selected or automatically selected JVM's
+    * JavaInfo object.
+    */
     public JavaInfo getCurrentJava () {
         if (currentJava == null) {
             try {
-                currentJava = JavaInfo.getJavaInfo(getJavaPath());
+                currentJava = new JavaInfo(getJavaPath());
             } catch (Exception e) {
                 Logger.logError("Error while creating JavaInfo", e);
             }
@@ -163,20 +154,19 @@ public class Settings extends Properties {
     }
 
     public String getDefaultJavaPath () {
+        String separator = System.getProperty("file.separator");
         JavaInfo javaVersion;
 
         if (OSUtils.getCurrentOS() == OS.MACOSX) {
             javaVersion = JavaFinder.parseJavaVersion();
 
-            if (javaVersion != null && javaVersion.path != null) {
+            if (javaVersion != null && javaVersion.path != null)
                 return javaVersion.path;
-            }
         } else if (OSUtils.getCurrentOS() == OS.WINDOWS) {
             javaVersion = JavaFinder.parseJavaVersion();
 
-            if (javaVersion != null && javaVersion.path != null) {
+            if (javaVersion != null && javaVersion.path != null)
                 return javaVersion.path.replace(".exe", "w.exe");
-            }
         }
 
         // Windows specific code adds <java.home>/bin/java no need mangle javaw.exe here.
@@ -257,9 +247,8 @@ public class Settings extends Properties {
 
     public void setPackVer (String string) {
         setProperty(ModPack.getSelectedPack().getDir(), string);
-        if (ModPack.getSelectedPack().getDir().equals("mojang_vanilla")) {
+        if (ModPack.getSelectedPack().getDir().equals("mojang_vanilla"))
             ModPack.setVanillaPackMCVersion(string.equalsIgnoreCase("Recommended Version") ? ModPack.getSelectedPack().getVersion() : string);
-        }
     }
 
     public String getPackVer () {
@@ -305,10 +294,8 @@ public class Settings extends Properties {
         String out = "";
         String sep = "";
         for (String s : codes) {
-            if (!s.isEmpty()) {
-                out += sep + s;
-                sep = ",";
-            }
+            out += sep + s;
+            sep = ",";
         }
         setProperty("privatePacks", out);
     }
@@ -334,12 +321,10 @@ public class Settings extends Properties {
     public void setLastExtendedState (int lastExtendedState) {
         setProperty("lastExtendedState", String.valueOf(lastExtendedState));
     }
-
-    public void setGeneratedID (String uuid) {
+    public void setGeneratedID(String uuid) {
         setProperty("trackinguuid", uuid);
     }
-
-    public String getGeneratedID () {
+    public String getGeneratedID() {
         return getProperty("trackinguuid", "");
     }
 
@@ -352,7 +337,7 @@ public class Settings extends Properties {
     }
 
     public boolean getKeepLauncherOpen () {
-        return Boolean.parseBoolean(getProperty("keepLauncherOpen", "true"));
+        return Boolean.parseBoolean(getProperty("keepLauncherOpen", "false"));
     }
 
     public void setSnooper (boolean state) {
@@ -406,22 +391,6 @@ public class Settings extends Properties {
             lastPosition = new Point(300, 300);
         }
         return lastPosition;
-    }
-
-    public int getMinJava8HackVsn () {
-        return Integer.parseInt(getProperty("MinJava8HackVsn", "965"));
-    }
-
-    public void setMinJava8HackVsn (int java8HackVsn) {
-        setProperty("MinJava8HackVsn", String.valueOf(java8HackVsn));
-    }
-
-    public int getMaxJava8HackVsn () {
-        return Integer.parseInt(getProperty("MaxJava8HackVsn", "1209"));
-    }
-
-    public void setMaxJava8HackVsn (int java8HackVsn) {
-        setProperty("MaxJava8HackVsn", String.valueOf(java8HackVsn));
     }
 
     public void setLastDimension (Dimension lastDimension) {
@@ -482,22 +451,22 @@ public class Settings extends Properties {
     /**
      * Simple boolean setting getter
      */
-    public boolean getBoolean (String name) {
+    public boolean getBoolean(String name) {
         return Boolean.valueOf(getProperty(name, "false"));
     }
 
     /**
      * Simple boolean setting setter
      */
-    public void setBoolean (String name, boolean value) {
+    public void setBoolean(String name, boolean value) {
         setProperty(name, String.valueOf(value));
     }
 
     /**
      * Clean all setting from namespace
      */
-    public void cleanNamespace (String name) {
-        for (String s : stringPropertyNames()) {
+    public void cleanNamespace(String name) {
+        for (String s: stringPropertyNames()) {
             if (s.startsWith(name)) {
                 remove(s);
             }

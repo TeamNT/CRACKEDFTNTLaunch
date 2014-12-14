@@ -16,19 +16,10 @@
  */
 package net.ftb.util;
 
-import lombok.Getter;
-import net.ftb.data.CommandLineSettings;
-import net.ftb.gui.LaunchFrame;
-import net.ftb.log.Logger;
-import net.ftb.util.winreg.JavaFinder;
-import net.ftb.util.winreg.RuntimeStreamer;
-
-import java.awt.*;
+import java.awt.Desktop;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.Method;
@@ -40,7 +31,10 @@ import java.security.CodeSource;
 import java.util.Enumeration;
 import java.util.Map;
 
-import javax.swing.text.html.StyleSheet;
+import lombok.Getter;
+import net.ftb.gui.LaunchFrame;
+import net.ftb.log.Logger;
+import net.ftb.util.winreg.JavaFinder;
 
 public class OSUtils {
     private static byte[] cachedMacAddress;
@@ -48,12 +42,11 @@ public class OSUtils {
 
     /**
      * gets the number of cores for use in DL threading
-     *
+     * 
      * @return number of cores on the system
      */
     @Getter
     private static int numCores;
-    private static byte[] hardwareID;
 
     public static enum OS {
         WINDOWS, UNIX, MACOSX, OTHER,
@@ -69,37 +62,16 @@ public class OSUtils {
      * @return a string containing the default install path for the current OS.
      */
     public static String getDefInstallPath () {
-        switch (getCurrentOS()) {
-        case WINDOWS:
-            String defaultLocation = "C:\\FTB";
-            File testFile = new File(defaultLocation);
-            // existing directory and we can write
-            if (testFile.canWrite()) {
-                return defaultLocation;
-            }
-
-            // We can create default directory
-            if (testFile.getParentFile().canWrite()) {
-                return defaultLocation;
-            }
-            Logger.logWarn("Can't use default installation location. Using current location of the launcher executable.");
-
-        case MACOSX:
-            return System.getProperty("user.home") + "/FTB";
-        case UNIX:
-            return System.getProperty("user.home") + "/FTB";
-        default:
-            try {
-                CodeSource codeSource = LaunchFrame.class.getProtectionDomain().getCodeSource();
-                File jarFile;
-                jarFile = new File(codeSource.getLocation().toURI().getPath());
-                return jarFile.getParentFile().getPath();
-            } catch (URISyntaxException e) {
-                Logger.logError("Unexcepted error", e);
-            }
-
-            return System.getProperty("user.home") + System.getProperty("path.separator") + "FTB";
+        try {
+            CodeSource codeSource = LaunchFrame.class.getProtectionDomain().getCodeSource();
+            File jarFile;
+            jarFile = new File(codeSource.getLocation().toURI().getPath());
+            return jarFile.getParentFile().getPath();
+        } catch (URISyntaxException e) {
+            Logger.logError("Unexcepted error", e);
         }
+        Logger.logWarn("Failed to get path for current directory - falling back to user's home directory.");
+        return System.getProperty("user.dir") + "//FTNT Pack Install";
     }
 
     /**
@@ -107,16 +79,13 @@ public class OSUtils {
      * @return string containing dynamic storage location
      */
     public static String getDynamicStorageLocation () {
-        if (CommandLineSettings.getSettings().getDynamicDir() != null && !CommandLineSettings.getSettings().getDynamicDir().isEmpty()) {
-            return CommandLineSettings.getSettings().getDynamicDir();
-        }
         switch (getCurrentOS()) {
         case WINDOWS:
-            return System.getenv("APPDATA") + "/ftblauncher/";
+            return System.getenv("APPDATA") + "/ftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftblauncher/";
+            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftblauncher/";
+            return cachedUserHome + "/.ftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -125,24 +94,20 @@ public class OSUtils {
     /**
      * Used to get a location to store cached content such as maps,
      * texture packs and pack archives.
-     *
+     * 
      * @return string containing cache storage location
      */
     public static String getCacheStorageLocation () {
-        if (CommandLineSettings.getSettings().getCacheDir() != null && !CommandLineSettings.getSettings().getCacheDir().isEmpty()) {
-            return CommandLineSettings.getSettings().getCacheDir();
-        }
         switch (getCurrentOS()) {
         case WINDOWS:
-            if (System.getenv("LOCALAPPDATA") != null && System.getenv("LOCALAPPDATA").length() > 5) {
-                return System.getenv("LOCALAPPDATA") + "/ftblauncher/";
-            } else {
-                return System.getenv("APPDATA") + "/ftblauncher/";
-            }
+            if (System.getenv("LOCALAPPDATA") != null && System.getenv("LOCALAPPDATA").length() > 5)
+                return System.getenv("LOCALAPPDATA") + "/ftntlauncher/";
+            else
+                return System.getenv("APPDATA") + "/ftntlauncher/";
         case MACOSX:
-            return cachedUserHome + "/Library/Application Support/ftblauncher/";
+            return cachedUserHome + "/Library/Application Support/ftntlauncher/";
         case UNIX:
-            return cachedUserHome + "/.ftblauncher/";
+            return cachedUserHome + "/.ftntlauncher/";
         default:
             return getDefInstallPath() + "/temp/";
         }
@@ -159,13 +124,13 @@ public class OSUtils {
                 // Migrate cached archives from the user's roaming profile to their local cache
 
                 Logger.logInfo("Migrating cached Maps from Roaming to Local storage");
-                FTBFileUtils.move(new File(dynamicDir, "Maps"), new File(cacheDir, "Maps"));
+                FileUtils.move(new File(dynamicDir, "Maps"), new File(cacheDir, "Maps"));
 
                 Logger.logInfo("Migrating cached Modpacks from Roaming to Local storage");
-                FTBFileUtils.move(new File(dynamicDir, "ModPacks"), new File(cacheDir, "ModPacks"));
+                FileUtils.move(new File(dynamicDir, "ModPacks"), new File(cacheDir, "ModPacks"));
 
                 Logger.logInfo("Migrating cached Texturepacks from Roaming to Local storage");
-                FTBFileUtils.move(new File(dynamicDir, "TexturePacks"), new File(cacheDir, "TexturePacks"));
+                FileUtils.move(new File(dynamicDir, "TexturePacks"), new File(cacheDir, "TexturePacks"));
 
                 Logger.logInfo("Migration complete.");
             }
@@ -286,9 +251,9 @@ public class OSUtils {
      * @return true if 64-bit OS X
      */
 
-    public static boolean is64BitOSX () {
+    public static boolean is64BitOSX() {
         String line, result = "";
-        if (!(System.getProperty("os.version").startsWith("10.6") || System.getProperty("os.version").startsWith("10.5"))) {
+        if( !(System.getProperty("os.version").startsWith("10.6") || System.getProperty("os.version").startsWith("10.5"))) {
             return true;//10.7+ only shipped on hardware capable of using 64 bit java
         }
         try {
@@ -392,89 +357,6 @@ public class OSUtils {
     }
 
     /**
-     *
-     * @return Unique Id based on hardware
-     */
-    public static byte[] getHardwareID () {
-        if (hardwareID == null) {
-            hardwareID = genHardwareID();
-        }
-        return hardwareID;
-    }
-
-    private static byte[] genHardwareID () {
-        switch (getCurrentOS()) {
-        case WINDOWS:
-            return genHardwareIDWINDOWS();
-        case UNIX:
-            return genHardwareIDUNIX();
-        case MACOSX:
-            return genHardwareIDMACOSX();
-        default:
-            return null;
-        }
-    }
-
-    private static byte[] genHardwareIDUNIX () {
-        String line;
-        if (CommandLineSettings.getSettings().isUseMac()) {
-            try {
-                BufferedReader reader = new BufferedReader(new FileReader("/etc/machine-id"));
-                line = reader.readLine();
-            } catch (Exception e) {
-                Logger.logDebug("failed", e);
-                return new byte[] { };
-            }
-            return line.getBytes();
-        } else {
-            return new byte[] { };
-        }
-    }
-
-    private static byte[] genHardwareIDMACOSX () {
-        String line;
-        try {
-            Process command = Runtime.getRuntime().exec(new String[] { "system_profiler", "SPHardwareDataType" });
-            BufferedReader in = new BufferedReader(new InputStreamReader(command.getInputStream()));
-            while ((line = in.readLine()) != null) {
-                if (line.contains("Serial Number"))
-                //TODO: does that more checks?
-                {
-                    return line.split(":")[1].trim().getBytes();
-                }
-            }
-            return new byte[] { };
-        } catch (Exception e) {
-            Logger.logDebug("failed", e);
-            return new byte[] { };
-        }
-    }
-
-    private static byte[] genHardwareIDWINDOWS () {
-        String processOutput;
-        try {
-            processOutput = RuntimeStreamer.execute(new String[] { "wmic", "bios", "get", "serialnumber" });
-            /*
-             * wmic's output has special formatting:
-             * SerialNumber<SP><SP><SP><CR><CR><LF>
-             * 00000000000000000<SP><CR><CR><LF><CR><CR><LF>
-             *
-             * readLin()e uses <LF>, <CR> or <CR><LF> as line ending => we need to get third line from RuntimeStreamers output
-             */
-            String line = processOutput.split("\n")[2].trim();
-            // at least VM will report serial to be 0. Does real hardware do it?
-            if (line.equals("0")) {
-                return new byte[] { };
-            } else {
-                return line.trim().getBytes();
-            }
-        } catch (Exception e) {
-            Logger.logDebug("failed", e);
-            return new byte[] { };
-        }
-    }
-
-    /**
      * Opens the given URL in the default browser
      * @param url The URL
      */
@@ -489,7 +371,7 @@ public class OSUtils {
                 Logger.logWarn("Could not open Java Download url, not supported");
             }
         } catch (Exception e) {
-            Logger.logError("Could not open link: " + url, e);
+            Logger.logError("Could not open link", e);
         }
     }
 
@@ -529,19 +411,5 @@ public class OSUtils {
         environment.remove("_JAVA_OPTIONS");
         environment.remove("JAVA_TOOL_OPTIONS");
         environment.remove("JAVA_OPTIONS");
-    }
-
-    public static StyleSheet makeStyleSheet (String name) {
-        try {
-            StyleSheet sheet = new StyleSheet();
-            Reader reader = new InputStreamReader(System.class.getResourceAsStream("/css/" + name + ".css"));
-            sheet.loadRules(reader, null);
-            reader.close();
-
-            return sheet;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
     }
 }

@@ -16,26 +16,23 @@
  */
 package net.ftb.download.workers;
 
-import static com.google.common.net.HttpHeaders.CACHE_CONTROL;
-import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
-import static com.google.common.net.HttpHeaders.CONTENT_MD5;
-import static com.google.common.net.HttpHeaders.ETAG;
-
-import com.google.common.collect.Lists;
-import lombok.Getter;
-import net.ftb.download.info.DownloadInfo;
-import net.ftb.download.info.DownloadInfo.DLType;
-import net.ftb.log.Logger;
-import net.ftb.util.DownloadUtils;
-
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.util.List;
 
-import javax.swing.*;
+import javax.swing.ProgressMonitor;
+import javax.swing.SwingWorker;
+
+import com.google.common.collect.Lists;
+import lombok.Getter;
+
+import net.ftb.download.info.DownloadInfo;
+import net.ftb.download.info.DownloadInfo.DLType;
+import net.ftb.log.Logger;
+import net.ftb.util.DownloadUtils;
 
 public class AssetDownloader extends SwingWorker<Boolean, Void> {
     private List<DownloadInfo> downloads;
@@ -48,7 +45,7 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
     @Getter
     private int ready = 0;
 
-    public AssetDownloader (final ProgressMonitor monitor, List<DownloadInfo> downloads) {
+    public AssetDownloader(final ProgressMonitor monitor, List<DownloadInfo> downloads) {
         this.downloads = downloads;
         this.monitor = monitor;
     }
@@ -87,9 +84,8 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
 
         while (!downloadSuccess && (attempt < attempts)) {
             try {
-                if (remoteHash == null) {
+                if(remoteHash == null)
                     remoteHash = Lists.newArrayList();
-                }
                 hashType = asset.hashType;
                 if (attempt++ > 0) {
                     Logger.logInfo("Connecting.. Try " + attempt + " of " + attempts + " for: " + asset.url);
@@ -99,21 +95,21 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
                 //HTTPURLConnection con = (HttpURLConnection) asset.url.openConnection();
                 URLConnection con = asset.url.openConnection();
                 if (con instanceof HttpURLConnection) {
-                    con.setRequestProperty(CACHE_CONTROL, "no-cache, no-transform");
+                    con.setRequestProperty("Cache-Control", "no-cache, no-transform");
                     ((HttpURLConnection) con).setRequestMethod("HEAD");
                     con.connect();
                 }
 
                 // gather data for basic checks
-                long remoteSize = Long.parseLong(con.getHeaderField(CONTENT_LENGTH));
+                long remoteSize = Long.parseLong(con.getHeaderField("Content-Length"));
                 if (asset.hash == null && asset.getPrimaryDLType() == DLType.ETag) {
                     remoteHash.clear();
-                    remoteHash.add(con.getHeaderField(ETAG).replace("\"", ""));
+                    remoteHash.add(con.getHeaderField("ETag").replace("\"", ""));
                     hashType = "md5";
                 }
                 if (asset.hash == null && asset.getPrimaryDLType() == DLType.ContentMD5) {
                     remoteHash.clear();
-                    remoteHash.add(con.getHeaderField(CONTENT_MD5).replace("\"", ""));
+                    remoteHash.add(con.getHeaderField("Content-MD5").replace("\"", ""));
                     hashType = "md5";
                 }
 
@@ -146,7 +142,7 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
                 setStatus("Downloading " + asset.name + "...");
                 con = asset.url.openConnection();
                 if (con instanceof HttpURLConnection) {
-                    con.setRequestProperty(CACHE_CONTROL, "no-cache, no-transform");
+                    con.setRequestProperty("Cache-Control", "no-cache, no-transform");
                     ((HttpURLConnection) con).setRequestMethod("GET");
                     con.connect();
                 }
@@ -159,12 +155,10 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
                     output.write(buffer, 0, readLen);
                     currentSize += readLen;
                     int prog = (int) ((currentSize / remoteSize) * 100);
-                    if (prog > 100) {
+                    if (prog > 100)
                         prog = 100;
-                    }
-                    if (prog < 0) {
+                    if (prog < 0)
                         prog = 0;
-                    }
 
                     setProgress(prog);
 
@@ -207,9 +201,8 @@ public class AssetDownloader extends SwingWorker<Boolean, Void> {
                 good = true;
             }
         }
-        if (good || assetHash != null && assetHash.contains(hash)) {
+        if (good || assetHash != null && assetHash.contains(hash))
             return true;
-        }
         Logger.logWarn("Asset hash checking failed: " + asset.name + " " + asset.hashType + " " + hash);//unhashed DL's are not allowed!!!
         asset.local.delete();
         return false;

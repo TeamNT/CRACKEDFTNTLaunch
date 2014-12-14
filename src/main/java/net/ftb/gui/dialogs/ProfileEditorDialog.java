@@ -16,19 +16,26 @@
  */
 package net.ftb.gui.dialogs;
 
-import net.ftb.data.UserManager;
-import net.ftb.gui.GuiConstants;
-import net.ftb.gui.LaunchFrame;
-import net.ftb.locale.I18N;
-import net.miginfocom.swing.MigLayout;
-
-import java.awt.*;
+import java.awt.Container;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import javax.swing.*;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+import javax.swing.Spring;
+import javax.swing.SpringLayout;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+
+import net.ftb.data.UserManager;
+import net.ftb.gui.LaunchFrame;
+import net.ftb.locale.I18N;
+import net.ftb.util.SwingUtils;
 
 @SuppressWarnings("serial")
 public class ProfileEditorDialog extends JDialog {
@@ -42,7 +49,7 @@ public class ProfileEditorDialog extends JDialog {
     private JButton update;
     private JButton remove;
 
-    public ProfileEditorDialog (LaunchFrame instance, final String editingName, boolean modal) {
+    public ProfileEditorDialog(LaunchFrame instance, final String editingName, boolean modal) {
         super(instance, modal);
 
         setupGui();
@@ -96,7 +103,7 @@ public class ProfileEditorDialog extends JDialog {
                     } else {
                         UserManager.updateUser(editingName, username.getText(), "", name.getText());
                     }
-                    UserManager.setSaveMojangData(editingName, saveMojangData.isSelected());
+                    UserManager.setSaveMojangData(username.getText(), saveMojangData.isSelected());
                     LaunchFrame.writeUsers(name.getText());
                     setVisible(false);
                 }
@@ -116,10 +123,11 @@ public class ProfileEditorDialog extends JDialog {
     private void setupGui () {
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
         setTitle(I18N.getLocaleString("PROFILEDITOR_TITLE"));
-        setResizable(true);
+        setResizable(false);
 
         Container panel = getContentPane();
-        panel.setLayout(new MigLayout());
+        SpringLayout layout = new SpringLayout();
+        panel.setLayout(layout);
 
         usernameLbl = new JLabel(I18N.getLocaleString("PROFILEADDER_USERNAME"));
         username = new JTextField(16);
@@ -137,15 +145,86 @@ public class ProfileEditorDialog extends JDialog {
         nameLbl.setLabelFor(name);
 
         panel.add(usernameLbl);
-        panel.add(username, GuiConstants.WRAP);
+        panel.add(username);
         panel.add(passwordLbl);
-        panel.add(password, GuiConstants.WRAP);
+        panel.add(password);
         panel.add(nameLbl);
-        panel.add(name, GuiConstants.WRAP);
-        panel.add(savePassword, GuiConstants.CENTER_SINGLE_LINE);
-        panel.add(saveMojangData, GuiConstants.CENTER_SINGLE_LINE);
-        panel.add(update, GuiConstants.CENTER_TWO);
+        panel.add(name);
+        panel.add(savePassword);
+        panel.add(saveMojangData);
+        panel.add(update);
         panel.add(remove);
+
+        Spring hSpring;
+        Spring columnWidth;
+
+        hSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.WEST, usernameLbl, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, passwordLbl, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, nameLbl, hSpring, SpringLayout.WEST, panel);
+
+        columnWidth = SwingUtils.springMax(Spring.width(usernameLbl), Spring.width(passwordLbl), Spring.width(nameLbl));
+
+        hSpring = SwingUtils.springSum(hSpring, columnWidth, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.WEST, username, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, password, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, name, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, savePassword, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, saveMojangData, hSpring, SpringLayout.WEST, panel);
+
+        columnWidth = SwingUtils.springMax(Spring.width(username), Spring.width(password), Spring.width(name), Spring.width(savePassword), Spring.width(saveMojangData));
+
+        hSpring = SwingUtils.springSum(hSpring, columnWidth, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.EAST, panel, hSpring, SpringLayout.WEST, panel);
+
+        layout.putConstraint(SpringLayout.EAST, update, -5, SpringLayout.HORIZONTAL_CENTER, panel);
+        layout.putConstraint(SpringLayout.WEST, remove, 5, SpringLayout.HORIZONTAL_CENTER, panel);
+
+        Spring vSpring;
+        Spring rowHeight;
+
+        vSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.BASELINE, usernameLbl, 0, SpringLayout.BASELINE, username);
+        layout.putConstraint(SpringLayout.NORTH, username, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.max(Spring.height(usernameLbl), Spring.height(username));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
+
+        layout.putConstraint(SpringLayout.BASELINE, passwordLbl, 0, SpringLayout.BASELINE, password);
+        layout.putConstraint(SpringLayout.NORTH, password, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.max(Spring.height(passwordLbl), Spring.height(password));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
+
+        layout.putConstraint(SpringLayout.BASELINE, nameLbl, 0, SpringLayout.BASELINE, name);
+        layout.putConstraint(SpringLayout.NORTH, name, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.max(Spring.height(nameLbl), Spring.height(name));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(5));
+
+        layout.putConstraint(SpringLayout.NORTH, savePassword, vSpring, SpringLayout.NORTH, panel);
+
+        vSpring = SwingUtils.springSum(vSpring, Spring.height(savePassword), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.NORTH, saveMojangData, vSpring, SpringLayout.NORTH, panel);
+
+        vSpring = SwingUtils.springSum(vSpring, Spring.height(saveMojangData), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.NORTH, update, vSpring, SpringLayout.NORTH, panel);
+        layout.putConstraint(SpringLayout.NORTH, remove, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.max( Spring.height(update), Spring.height(remove));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.SOUTH, panel, vSpring, SpringLayout.NORTH, panel);
 
         pack();
         setLocationRelativeTo(getOwner());

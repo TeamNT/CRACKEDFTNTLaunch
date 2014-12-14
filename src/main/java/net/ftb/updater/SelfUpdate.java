@@ -16,15 +16,15 @@
  */
 package net.ftb.updater;
 
-import com.google.common.collect.Lists;
-import net.ftb.log.Logger;
-import net.ftb.util.FTBFileUtils;
-import net.ftb.util.OSUtils;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.google.common.collect.Lists;
+import net.ftb.log.Logger;
+import net.ftb.util.FileUtils;
+import net.ftb.util.OSUtils;
 
 public class SelfUpdate {
     public static void runUpdate (String currentPath, String temporaryUpdatePath) {
@@ -57,15 +57,14 @@ public class SelfUpdate {
             if (OSUtils.getCurrentOS() != OSUtils.OS.UNIX) {
                 Thread.sleep(4000);//why is this here???
             }
-        } catch (InterruptedException ignored) {
-        }
+        } catch (InterruptedException ignored) { }
         String launcherPath = args[0];
         String temporaryUpdatePath = args[1];
         File launcher = new File(launcherPath);
         File temporaryUpdate = new File(temporaryUpdatePath);
         try {
-            FTBFileUtils.delete(launcher);
-            FTBFileUtils.copyFile(temporaryUpdate, launcher);
+            FileUtils.delete(launcher);
+            FileUtils.copyFile(temporaryUpdate, launcher);
         } catch (IOException e) {
             Logger.logError("Auto Updating Failed", e);
         }

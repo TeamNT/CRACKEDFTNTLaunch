@@ -16,6 +16,33 @@
  */
 package net.ftb.gui;
 
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.util.List;
+
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JEditorPane;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
+import javax.swing.text.html.HTMLDocument;
+import javax.swing.text.html.HTMLEditorKit;
+
 import net.ftb.data.Constants;
 import net.ftb.download.Locations;
 import net.ftb.locale.I18N;
@@ -29,61 +56,37 @@ import net.ftb.tools.PastebinPoster;
 import net.ftb.util.GameUtils;
 import net.ftb.util.OSUtils;
 
-import java.awt.*;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-
-import javax.swing.*;
-import javax.swing.text.Document;
-import javax.swing.text.SimpleAttributeSet;
-import javax.swing.text.StyleConstants;
-
 @SuppressWarnings("serial")
 public class LauncherConsole extends JFrame implements ILogListener {
-    private final JTextPane displayArea;
+    private final JEditorPane displayArea;
+    private final HTMLEditorKit kit;
+    private HTMLDocument doc;
     private final JComboBox logTypeComboBox;
     private LogType logType = LogType.MINIMAL;
     private final JComboBox logSourceComboBox;
     private LogSource logSource = LogSource.ALL;
     private LogLevel logLevel = LogLevel.INFO;
     private JButton killMCButton;
-    private final Document displayAreaDoc;
-    private final Font FONT = new Font("Monospaced", 0, 12);
 
-    private SimpleAttributeSet RED = new SimpleAttributeSet();
-    private SimpleAttributeSet YELLOW = new SimpleAttributeSet();
-
-    public LauncherConsole () {
+    public LauncherConsole() {
         setTitle(Constants.name + " " + I18N.getLocaleString("CONSOLE_TITLE"));
         setMinimumSize(new Dimension(800, 400));
-        setPreferredSize(new Dimension(800, 400));
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
         getContentPane().setLayout(new BorderLayout(0, 0));
 
-        StyleConstants.setForeground(RED, Color.RED);
-        StyleConstants.setForeground(YELLOW, Color.YELLOW);
-
-        // setup buttons
         JPanel panel = new JPanel();
 
         getContentPane().add(panel, BorderLayout.SOUTH);
         panel.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 5));
 
-        JButton paste = new JButton(I18N.getLocaleString("CONSOLE_PASTE"));
-        paste.addActionListener(new ActionListener() {
+        JButton pastebin = new JButton(I18N.getLocaleString("CONSOLE_PASTEBIN"));
+        pastebin.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
-                JOptionPane pane = new JOptionPane("The log will be sent to the FTB paste site and opened in your browser");
+                JOptionPane pane = new JOptionPane("The log will be copied to your clipboard and pastebin.com will be opened now");
                 Object[] options = new String[] { "Yes do it", "Cancel" };
                 pane.setOptions(options);
-                JDialog dialog = pane.createDialog(new JFrame(), I18N.getLocaleString("CONSOLE_PASTE"));
+                JDialog dialog = pane.createDialog(new JFrame(), I18N.getLocaleString("CONSOLE_PASTEBIN"));
                 dialog.setVisible(true);
                 Object obj = pane.getValue();
                 int result = -1;
@@ -98,7 +101,7 @@ public class LauncherConsole extends JFrame implements ILogListener {
                 }
             }
         });
-        panel.add(paste);
+        panel.add(pastebin);
 
         JButton clipboard = new JButton(I18N.getLocaleString("CONSOLE_COPYCLIP"));
         clipboard.addActionListener(new ActionListener() {
@@ -117,8 +120,7 @@ public class LauncherConsole extends JFrame implements ILogListener {
                     }
                 }
                 if (result == 0) {
-                    StringSelection stringSelection = new StringSelection("FTB Launcher logs:\n" + Logger.getLogs()
-                            + "[" + new SimpleDateFormat("HH:mm:ss").format(new Date()) + "]" + " Logs copied to clipboard");
+                    StringSelection stringSelection = new StringSelection("FTB Launcher logs:\n" + Logger.getLogs());
                     Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
                     clipboard.setContents(stringSelection, null);
                 }
@@ -135,13 +137,13 @@ public class LauncherConsole extends JFrame implements ILogListener {
                 // setup loglevel. If DEBUG selected show also DEBUG messages
                 switch (logType) {
                 case MINIMAL:
-                    logLevel = LogLevel.INFO;
+                    logLevel=LogLevel.INFO;
                     break;
                 case EXTENDED:
-                    logLevel = LogLevel.INFO;
+                    logLevel=LogLevel.INFO;
                     break;
                 case DEBUG:
-                    logLevel = LogLevel.DEBUG;
+                    logLevel=LogLevel.DEBUG;
                     break;
                 }
 
@@ -180,59 +182,58 @@ public class LauncherConsole extends JFrame implements ILogListener {
         });
         panel.add(killMCButton);
 
-        // setup log area
-        displayArea = new JTextPane() {
-            @Override
-            public boolean getScrollableTracksViewportWidth () {
-                return true;
-            }
-        };
-
-        displayArea.setFont(FONT);
+        displayArea = new JEditorPane("text/html", "");
         displayArea.setEditable(false);
-        displayAreaDoc = this.displayArea.getDocument();
-        displayArea.setMargin(null);
+        kit = new HTMLEditorKit();
+        displayArea.setEditorKit(kit);
+
+        DefaultCaret caret = (DefaultCaret) displayArea.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
         JScrollPane scrollPane = new JScrollPane(displayArea);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-
-        // Use third party library to implement autoscroll
-        new SmartScroller(scrollPane);
 
         getContentPane().add(scrollPane);
         pack();
 
+        refreshLogs();
+
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing (WindowEvent e) {
+            public void windowClosing(WindowEvent e) {
                 Logger.removeListener(LaunchFrame.con);
                 if (LaunchFrame.trayMenu != null) {
                     LaunchFrame.trayMenu.updateShowConsole(false);
                 }
-                dispose();
             }
         });
 
     }
 
-    synchronized public void refreshLogs () {
-        try {
-            displayAreaDoc.remove(0, displayAreaDoc.getLength());
-        } catch (Exception e) {
-            // ignore
-        }
-
+    synchronized private void refreshLogs () {
+        doc = new HTMLDocument();
+        displayArea.setDocument(doc);
         List<LogEntry> entries = Logger.getLogEntries();
+        StringBuilder logHTML = new StringBuilder();
         for (LogEntry entry : entries) {
+            // select only messages we want
             if ((logSource == LogSource.ALL || entry.source == logSource) && (logLevel == LogLevel.DEBUG || logLevel.includes(entry.level))) {
-                addMessage(entry, this.displayAreaDoc);
+                logHTML.append(getMessage(entry));
             }
         }
-        try {
-            displayAreaDoc.remove(0, 1);
-        } catch (Exception e) {
-            //ignore
+        addHTML(logHTML.toString());
+    }
+
+    private void addHTML (String html) {
+        synchronized (kit) {
+            try {
+                kit.insertHTML(doc, doc.getLength(), html, 0, 0, null);
+            } catch (BadLocationException ignored) {
+                Logger.logError(ignored.getMessage(), ignored);
+            } catch (IOException ignored) {
+                Logger.logError(ignored.getMessage(), ignored);
+            }
+            displayArea.setCaretPosition(displayArea.getDocument().getLength());
         }
     }
 
@@ -240,14 +241,14 @@ public class LauncherConsole extends JFrame implements ILogListener {
         displayArea.setCaretPosition(displayArea.getDocument().getLength());
     }
 
-    synchronized private void addMessage (LogEntry entry, Document d) {
-        SimpleAttributeSet color = null;
+    private String getMessage (LogEntry entry) {
+        String color = "white";
         switch (entry.level) {
         case ERROR:
-            color = RED;
+            color = "#FF7070";
             break;
         case WARN:
-            color = YELLOW;
+            color = "yellow";
         case INFO:
             break;
         case DEBUG:
@@ -257,28 +258,25 @@ public class LauncherConsole extends JFrame implements ILogListener {
         default:
             break;
         }
-        try {
-            d.insertString(d.getLength(), "\n" + entry.toString(logType), color);
-        } catch (Exception e) {
-            //ignore
-        }
+        return "<font color=\"" + color + "\">" + (entry.toString(logType).replace("<", "&lt;").replace(">", "&gt;").trim().replace("\r\n", "\n").replace("\n", "<br/>")) + "</font><br/>";
     }
 
-    public void minecraftStarted () {
+    public void minecraftStarted() {
         killMCButton.setEnabled(true);
     }
-
-    public void minecraftStopped () {
+    
+    public void minecraftStopped() {
         killMCButton.setEnabled(false);
     }
-
+    
     @Override
-    public void onLogEvent (final LogEntry entry) {
+    public void onLogEvent (LogEntry entry) {
         // drop unneeded messages as soon as possible
-        if ((logSource == LogSource.ALL || entry.source == logSource) && (logLevel == LogLevel.DEBUG || logLevel.includes(entry.level))) {
+        if ((logSource == LogSource.ALL || entry.source == logSource) && (logLevel == LogLevel.DEBUG || logLevel.includes(entry.level))){
+            final LogEntry entry_ = entry;
             SwingUtilities.invokeLater(new Runnable() {
-                public void run () {
-                    addMessage(entry, LaunchFrame.con.displayAreaDoc);
+                public void run() {
+                    addHTML(getMessage(entry_));
                 }
             });
         }

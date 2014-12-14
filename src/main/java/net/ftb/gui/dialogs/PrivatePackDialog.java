@@ -16,26 +16,27 @@
  */
 package net.ftb.gui.dialogs;
 
-import net.ftb.data.ModPack;
-import net.ftb.data.Settings;
-import net.ftb.gui.GuiConstants;
-import net.ftb.gui.LaunchFrame;
-import net.ftb.locale.I18N;
-import net.ftb.log.Logger;
-import net.ftb.util.DownloadUtils;
-import net.ftb.util.ErrorUtils;
-import net.ftb.util.FTBFileUtils;
-import net.ftb.util.OSUtils;
-import net.miginfocom.swing.MigLayout;
-
-import java.awt.*;
+import java.awt.Container;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import javax.swing.*;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JEditorPane;
+import javax.swing.JTextField;
+import javax.swing.Spring;
+import javax.swing.SpringLayout;
+
+import net.ftb.data.ModPack;
+import net.ftb.data.Settings;
+import net.ftb.gui.LaunchFrame;
+import net.ftb.locale.I18N;
+import net.ftb.log.Logger;
+import net.ftb.util.*;
 
 @SuppressWarnings("serial")
 public class PrivatePackDialog extends JDialog {
@@ -45,7 +46,7 @@ public class PrivatePackDialog extends JDialog {
     private JButton add;
     private JButton cancel;
 
-    public PrivatePackDialog () {
+    public PrivatePackDialog() {
         super(LaunchFrame.getInstance(), false);
 
         setupGui();
@@ -56,7 +57,7 @@ public class PrivatePackDialog extends JDialog {
             @Override
             public void actionPerformed (ActionEvent e) {
                 if (!modpackName.getText().isEmpty() && DownloadUtils.staticFileExists(modpackName.getText() + ".xml")) {
-                    if (!packExists(modpackName.getText())) {
+                    if (!Settings.getSettings().getPrivatePacks().contains(modpackName.getText())) {
                         Logger.logInfo("Adding: " + modpackName.getText());
                         ModPack.loadXml(modpackName.getText() + ".xml");
                         Settings.getSettings().addPrivatePack(modpackName.getText());
@@ -82,24 +83,19 @@ public class PrivatePackDialog extends JDialog {
             @Override
             public void actionPerformed (ActionEvent arg0) {
                 ArrayList<String> codes = Settings.getSettings().getPrivatePacks();
-                String toRemove = "";
-                for (String s : codes) {
-                    if (s.equalsIgnoreCase(modpackName.getText())) {
-                        toRemove = s;
-                    }
-                }
-                if (!toRemove.isEmpty()) {
-                    Settings.getSettings().removePrivatePack(toRemove);
+                if (codes.contains(modpackName.getText())) {
+                    Settings.getSettings().removePrivatePack(modpackName.getText());
                     Settings.getSettings().save();
                     try {
                         for (ModPack pack : ModPack.getPackArray()) {
-                            if (pack.getParentXml().equalsIgnoreCase(toRemove + ".xml")) {
-                                FTBFileUtils.delete(new File(OSUtils.getCacheStorageLocation(), "ModPacks/" + pack.getDir()));
+                            if (pack.getParentXml().equalsIgnoreCase(modpackName.getText() + ".xml")) {
+                                FileUtils.delete(new File(OSUtils.getCacheStorageLocation(), "ModPacks/" + pack.getDir()));
                                 break;
                             }
                         }
-                        ModPack.removePacks(toRemove + ".xml");
-                        FTBFileUtils.delete(new File(OSUtils.getCacheStorageLocation(), "ModPacks/" + toRemove + ".xml"));
+                        ModPack.removePacks(modpackName.getText() + ".xml");
+                        FileUtils.delete(new File(OSUtils.getCacheStorageLocation(), "ModPacks/" + modpackName.getText() + ".xml"));
+                        LaunchFrame.getInstance().modPacksPane.filterPacks();
                     } catch (IOException e) {
                         Logger.logError("Error while deleting private modpack", e);
                     }
@@ -116,11 +112,11 @@ public class PrivatePackDialog extends JDialog {
     private void setupGui () {
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
         setTitle(I18N.getLocaleString("PRIVATEPACK_TITLE"));
-        setResizable(true);
-        setPreferredSize(new Dimension(300, 200));
+        setResizable(false);
 
         Container panel = getContentPane();
-        panel.setLayout(new MigLayout());
+        SpringLayout layout = new SpringLayout();
+        panel.setLayout(layout);
 
         editorPane = new JEditorPane();
         modpackName = new JTextField(16);
@@ -135,23 +131,62 @@ public class PrivatePackDialog extends JDialog {
         editorPane.setContentType("text/html");
         editorPane.setText(I18N.getLocaleString("PRIVATEPACK_TEXT"));
 
-        panel.add(editorPane, GuiConstants.FILL_SINGLE_LINE);
-        panel.add(modpackName, GuiConstants.FILL_SINGLE_LINE);
-        panel.add(add, GuiConstants.FILL_THREE);
-        panel.add(remove, GuiConstants.GROW);
-        panel.add(cancel, GuiConstants.GROW);
+        panel.add(modpackName);
+        panel.add(add);
+        panel.add(cancel);
+        panel.add(editorPane);
+        panel.add(remove);
+
+        Spring hSpring;
+
+        hSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.WEST, editorPane, hSpring, SpringLayout.WEST, panel);
+
+        layout.putConstraint(SpringLayout.WEST, modpackName, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, add, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.WEST, remove, hSpring, SpringLayout.EAST, add);
+        layout.putConstraint(SpringLayout.WEST, cancel, hSpring, SpringLayout.EAST, remove);
+
+        hSpring = SwingUtils.springSum(hSpring, Spring.width(add), Spring.constant(10), Spring.width(remove), Spring.constant(10), Spring.width(cancel));
+        hSpring = Spring.max(hSpring, Spring.width(modpackName));
+
+        layout.putConstraint(SpringLayout.EAST, modpackName, hSpring, SpringLayout.WEST, panel);
+        layout.putConstraint(SpringLayout.EAST, editorPane, hSpring, SpringLayout.WEST, panel);
+
+        hSpring = Spring.sum(hSpring, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.EAST, panel, hSpring, SpringLayout.WEST, panel);
+
+        // force the editorPane to wrap it's text.
+        pack();
+
+        Spring vSpring;
+        Spring rowHeight;
+
+        vSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.NORTH, editorPane, vSpring, SpringLayout.NORTH, panel);
+
+        vSpring = SwingUtils.springSum(vSpring, Spring.height(editorPane), Spring.constant(5));
+
+        layout.putConstraint(SpringLayout.NORTH, modpackName, vSpring, SpringLayout.NORTH, panel);
+
+        vSpring = SwingUtils.springSum(vSpring, Spring.height(modpackName), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.NORTH, add, vSpring, SpringLayout.NORTH, panel);
+        layout.putConstraint(SpringLayout.NORTH, remove, vSpring, SpringLayout.NORTH, panel);
+        layout.putConstraint(SpringLayout.NORTH, cancel, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.height(add);
+        rowHeight = SwingUtils.springMax(rowHeight, Spring.height(remove), Spring.height(cancel));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.SOUTH, panel, vSpring, SpringLayout.NORTH, panel);
 
         pack();
         modpackName.requestFocusInWindow();
         setLocationRelativeTo(getOwner());
-    }
-
-    private boolean packExists (String name) {
-        for (String p : Settings.getSettings().getPrivatePacks()) {
-            if (p.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
     }
 }

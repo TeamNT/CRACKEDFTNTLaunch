@@ -16,16 +16,21 @@
  */
 package net.ftb.gui.dialogs;
 
-import net.ftb.gui.GuiConstants;
-import net.ftb.gui.LaunchFrame;
-import net.ftb.locale.I18N;
-import net.miginfocom.swing.MigLayout;
-
-import java.awt.*;
+import java.awt.Container;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import javax.swing.*;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPasswordField;
+import javax.swing.Spring;
+import javax.swing.SpringLayout;
+
+import net.ftb.gui.LaunchFrame;
+import net.ftb.locale.I18N;
+import net.ftb.util.SwingUtils;
 
 @SuppressWarnings("serial")
 public class PasswordDialog extends JDialog {
@@ -33,7 +38,7 @@ public class PasswordDialog extends JDialog {
     private JPasswordField password;
     private JButton login;
 
-    public PasswordDialog (LaunchFrame instance, boolean modal) {
+    public PasswordDialog(LaunchFrame instance, boolean modal) {
         super(instance, modal);
         setupGui();
 
@@ -52,18 +57,53 @@ public class PasswordDialog extends JDialog {
     private void setupGui () {
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
         setTitle(I18N.getLocaleString("PASSWORD_TITLE"));
-        setResizable(true);
+        setResizable(false);
 
         Container panel = getContentPane();
-        panel.setLayout(new MigLayout());
+        SpringLayout layout = new SpringLayout();
+        panel.setLayout(layout);
 
         passwordLbl = new JLabel(I18N.getLocaleString("PASSWORD_PASSLABEL"));
         password = new JPasswordField(16);
         login = new JButton(I18N.getLocaleString("MAIN_SUBMIT"));
 
         panel.add(passwordLbl);
-        panel.add(password, GuiConstants.WRAP);
-        panel.add(login, GuiConstants.CENTER_SINGLE_LINE);
+        panel.add(password);
+        panel.add(login);
+
+        Spring hSpring;
+
+        hSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.WEST, passwordLbl, hSpring, SpringLayout.WEST, panel);
+
+        hSpring = SwingUtils.springSum(hSpring, Spring.width(passwordLbl), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.WEST, password, hSpring, SpringLayout.WEST, panel);
+
+        hSpring = SwingUtils.springSum(hSpring, Spring.width(password), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.EAST, panel, hSpring, SpringLayout.WEST, panel);
+
+        layout.putConstraint(SpringLayout.HORIZONTAL_CENTER, login, 0, SpringLayout.HORIZONTAL_CENTER, panel);
+
+        Spring vSpring;
+        Spring rowHeight;
+
+        vSpring = Spring.constant(10);
+
+        layout.putConstraint(SpringLayout.BASELINE, passwordLbl, 0, SpringLayout.BASELINE, password);
+        layout.putConstraint(SpringLayout.NORTH, password, vSpring, SpringLayout.NORTH, panel);
+
+        rowHeight = Spring.max(Spring.height(passwordLbl), Spring.height(password));
+
+        vSpring = SwingUtils.springSum(vSpring, rowHeight, Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.NORTH, login, vSpring, SpringLayout.NORTH, panel);
+
+        vSpring = SwingUtils.springSum(vSpring, Spring.height(login), Spring.constant(10));
+
+        layout.putConstraint(SpringLayout.SOUTH, panel, vSpring, SpringLayout.NORTH, panel);
 
         pack();
         setLocationRelativeTo(getOwner());

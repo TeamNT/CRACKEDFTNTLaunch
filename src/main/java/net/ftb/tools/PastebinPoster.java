@@ -16,11 +16,6 @@
  */
 package net.ftb.tools;
 
-import net.ftb.data.Constants;
-import net.ftb.log.Logger;
-import net.ftb.main.Main;
-import net.ftb.util.OSUtils;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,8 +24,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+
+import net.ftb.log.Logger;
+import net.ftb.util.OSUtils;
 
 public class PastebinPoster extends Thread {
     @Override
@@ -39,7 +35,7 @@ public class PastebinPoster extends Thread {
         OutputStream out = null;
         InputStream in = null;
         try {
-            URL url = new URL("http://paste.feed-the-beast.com/api/create?apikey=b6a30d5f030ce86a2b0723ed0b494cdd");
+            URL url = new URL("http://pastebin.com/api/api_post.php");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("Cache-Control", "no-transform");
             conn.setConnectTimeout(5000);
@@ -50,12 +46,9 @@ public class PastebinPoster extends Thread {
             conn.setDoOutput(true);
             out = conn.getOutputStream();
 
-            out.write(("text=" + URLEncoder.encode(Logger.getLogs(), "utf-8")
-                               + "[" + new SimpleDateFormat("HH:mm:ss").format(new Date()) + "]" + " Post created"
-                               + "&private=" + URLEncoder.encode("0", "utf-8")
-                               + "&title=" + URLEncoder.encode("Version: " + Constants.version + "." + Main.getBeta(), "utf-8")
-                               + "&lang=" + URLEncoder.encode("FTB Logs", "utf-8")
-                               + "&name=" + URLEncoder.encode("Launcher")).getBytes());
+            out.write(("api_option=paste" + "&api_dev_key=" + URLEncoder.encode("9a4b85f815457ff6a512c6abad06ea24", "utf-8") + "&api_paste_code=" + URLEncoder.encode("Posted from FTB Launcher\n", "utf-8") + URLEncoder.encode(Logger.getLogs(), "utf-8")
+                    + "&api_paste_private=" + URLEncoder.encode("0", "utf-8") + "&api_paste_name=" + URLEncoder.encode("", "utf-8") + "&api_paste_expire_date=" + URLEncoder.encode("1D", "utf-8")
+                    + "&api_paste_format=" + URLEncoder.encode("text", "utf-8") + "&api_user_key=" + URLEncoder.encode("", "utf-8")).getBytes());
             out.flush();
             out.close();
 

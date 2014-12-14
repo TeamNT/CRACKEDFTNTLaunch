@@ -16,23 +16,6 @@
  */
 package net.ftb.tools;
 
-import static com.google.common.net.HttpHeaders.CACHE_CONTROL;
-import static com.google.common.net.HttpHeaders.CONTENT_MD5;
-import static net.ftb.download.Locations.MODPACKS;
-import static net.ftb.download.Locations.PRIVATEPACKS;
-
-import net.ftb.data.ModPack;
-import net.ftb.data.Settings;
-import net.ftb.gui.LaunchFrame;
-import net.ftb.gui.dialogs.ModpackUpdateDialog;
-import net.ftb.log.Logger;
-import net.ftb.util.DownloadUtils;
-import net.ftb.util.ErrorUtils;
-import net.ftb.util.FTBFileUtils;
-import net.ftb.util.ModPackUtil;
-import net.ftb.util.OSUtils;
-import net.ftb.util.TrackerUtils;
-
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.BufferedInputStream;
@@ -47,8 +30,29 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 
-import javax.swing.*;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.border.EmptyBorder;
+
+import net.ftb.data.ModPack;
+import net.ftb.data.Settings;
+import net.ftb.gui.LaunchFrame;
+import net.ftb.gui.dialogs.ModpackUpdateDialog;
+import net.ftb.log.Logger;
+import net.ftb.util.AppUtils;
+import net.ftb.util.DownloadUtils;
+import net.ftb.util.ErrorUtils;
+import net.ftb.util.FileUtils;
+import net.ftb.util.OSUtils;
+import net.ftb.util.TrackerUtils;
+import static net.ftb.download.Locations.MODPACKS;
+import static net.ftb.download.Locations.PRIVATEPACKS;
 
 @SuppressWarnings("serial")
 public class ModManager extends JDialog {
@@ -72,13 +76,11 @@ public class ModManager extends JDialog {
                     pack.setUpdated(true);
                     File modPackZip = new File(installPath, "ModPacks" + sep + pack.getDir() + sep + pack.getUrl());
                     if (modPackZip.exists()) {
-                        FTBFileUtils.delete(modPackZip);
-                        //Also clear out the "default mods" cache entry, if any, to force it to update when next requested
-                        ModPackUtil.clearDefaultModFiles(pack);
+                        FileUtils.delete(modPackZip);
                     }
                     File animationGif = new File(OSUtils.getCacheStorageLocation(), "ModPacks" + sep + pack.getDir() + sep + pack.getAnimation());
                     if (animationGif.exists()) {
-                        FTBFileUtils.delete(animationGif);
+                        FileUtils.delete(animationGif);
                     }
                     String dynamicLoc = OSUtils.getCacheStorageLocation();
                     baseDynamic = new File(dynamicLoc, "ModPacks" + sep + pack.getDir() + sep);
@@ -91,8 +93,7 @@ public class ModManager extends JDialog {
             return true;
         }
 
-        public String downloadUrl (String filename, String urlString) throws Exception{
-            boolean failed = false;
+        public String downloadUrl (String filename, String urlString) {
             BufferedInputStream in = null;
             FileOutputStream fout;
             HttpURLConnection connection = null;
@@ -124,7 +125,7 @@ public class ModManager extends JDialog {
                     });
 
                     connection = (HttpURLConnection) url_.openConnection();
-                    connection.setRequestProperty(CACHE_CONTROL, "no-transform");
+                    connection.setRequestProperty("Cache-Control", "no-transform");
                     connection.setAllowUserInteraction(true);
                     connection.setConnectTimeout(14000);
                     connection.setReadTimeout(20000);
@@ -132,7 +133,8 @@ public class ModManager extends JDialog {
                         connection.setRequestProperty("Range", "bytes=" + amount + "-");
                     }
                     connection.connect();
-                    md5 = connection.getHeaderField(CONTENT_MD5);
+                    ModPack pack = ModPack.getSelectedPack();
+                    md5 = AppUtils.downloadString(new URL("http://feedthenuketerrorist.fr.nf/MD5/" + pack.getDir() + "/" + curVersion + ".md5"));
                     in = new BufferedInputStream(connection.getInputStream());
                     if (modPackSize == 0) {
                         modPackSize = connection.getContentLength();
@@ -147,9 +149,8 @@ public class ModManager extends JDialog {
                     while ((count = in.read(data, 0, 1024)) != -1) {
                         fout.write(data, 0, count);
 
-                        if (count > 0) {
+                        if (count > 0)
                             retryCount = 5;
-                        }
 
                         downloadedPerc += (count * 1.0 / modPackSize) * 100;
                         amount += count;
@@ -168,10 +169,8 @@ public class ModManager extends JDialog {
                     }
                 } catch (MalformedURLException e) {
                     Logger.logError("Error while downloading modpack", e);
-                    failed = true;
                 } catch (IOException e) {
                     Logger.logError("Error while downloading modpack", e);
-                    failed = true;
                 }
 
                 try {
@@ -194,16 +193,12 @@ public class ModManager extends JDialog {
             } catch (IOException e) {
                 Logger.logWarn("Error while downloading modpack", e);
             }
-
-            if (failed) {
-                throw new Exception("Modpack download failed");
-            }
             return md5;
         }
 
         protected boolean downloadModPack (String modPackName, String dir) {
             Logger.logInfo("Downloading Mod Pack");
-            TrackerUtils.sendPageView("net/ftb/tools/ModManager.java", "Modpacks / " + modPackName + " / " + curVersion.replace('_', '.'));
+            TrackerUtils.sendPageView("net/ftb/tools/ModManager.java", "Downloaded: " + modPackName + " v." + curVersion.replace('_', '.'));
             String dynamicLoc = OSUtils.getCacheStorageLocation();
             String installPath = Settings.getSettings().getInstallPath();
             ModPack pack = ModPack.getSelectedPack();
@@ -231,30 +226,29 @@ public class ModManager extends JDialog {
                     File animationFile = new File(baseDynamic.getPath() + sep + animation);
 
                     if (!animation.equalsIgnoreCase("empty") && !animationFile.exists()) {
-                        downloadUrl(baseDynamic.getPath() + sep + animation, DownloadUtils.getCreeperhostLink(baseLink + animation));
+                            downloadUrl(baseDynamic.getPath() + sep + animation, DownloadUtils.getCreeperhostLink(baseLink + animation));
                     }
                 }
             } catch (Exception e) {
-                ErrorUtils.tossError("Error while downloading modpack", e);
-                return false;
+                Logger.logError("Error validating pack archive", e);
             }
 
             try {
                 if (!dir.equals("mojang_vanilla")
                         && ((md5 == null || md5.isEmpty()) ? DownloadUtils.backupIsValid(new File(baseDynamic, modPackName), baseLink + modPackName) : DownloadUtils.isValid(new File(baseDynamic,
-                        modPackName), md5))) {
+                                modPackName), md5))) {
                     Logger.logDebug("Extracting pack.");
                     Logger.logDebug("Purging mods, coremods, instMods");
                     clearModsFolder(pack);
-                    FTBFileUtils.delete(new File(installPath, dir + "/minecraft/coremods"));
-                    FTBFileUtils.delete(new File(installPath, dir + "/instMods/"));
+                    FileUtils.delete(new File(installPath, dir + "/minecraft/coremods"));
+                    FileUtils.delete(new File(installPath, dir + "/instMods/"));
                     boolean saveExists = false;
                     if (pack.getBundledMap()) {
                         try {
                             if (new File(installPath, dir + "/minecraft/saves").exists()) {
                                 saveExists = true;
-                                FTBFileUtils.delete(new File(installPath, dir + "/minecraft/saves.ftbtmp"));
-                                FTBFileUtils.copyFolder(new File(installPath, dir + "/minecraft/saves"), new File(installPath, dir + "/minecraft/saves.ftbtmp"), true);
+                                FileUtils.delete(new File(installPath, dir + "/minecraft/saves.ftbtmp"));
+                                FileUtils.copyFolder(new File(installPath, dir + "/minecraft/saves"), new File(installPath, dir + "/minecraft/saves.ftbtmp"), true);
                             }
                         } catch (Exception e) {
                             Logger.logError("error backing up map", e);
@@ -262,18 +256,14 @@ public class ModManager extends JDialog {
                     }
 
                     Logger.logDebug("Extracting pack.");
-                    if (!FTBFileUtils.extractZipTo(baseDynamic.getPath() + sep + modPackName, baseDynamic.getPath())) {
-                        ErrorUtils.tossError("Error downloading modpack!!!");
-                        return false;
-                    }
+                    FileUtils.extractZipTo(baseDynamic.getPath() + sep + modPackName, baseDynamic.getPath());
                     if (pack.getBundledMap() && saveExists) {
                         try {
-                            if (new File(installPath, dir + "/minecraft/saves").exists() && new File(installPath, dir + "/minecraft/saves.ftbtmp").exists()) {
-                                FTBFileUtils.delete(new File(installPath, dir + "/minecraft/saves"));
-                            }
+                            if (new File(installPath, dir + "/minecraft/saves").exists() && new File(installPath, dir + "/minecraft/saves.ftbtmp").exists())
+                                FileUtils.delete(new File(installPath, dir + "/minecraft/saves"));
                             if (new File(installPath, dir + "/minecraft/saves.ftbtmp").exists()) {
-                                FTBFileUtils.copyFolder(new File(installPath, dir + "/minecraft/saves.ftbtmp"), new File(installPath, dir + "/minecraft/saves"), true);
-                                FTBFileUtils.delete(new File(installPath, dir + "/minecraft/saves.ftbtmp"));
+                                FileUtils.copyFolder(new File(installPath, dir + "/minecraft/saves.ftbtmp"), new File(installPath, dir + "/minecraft/saves"), true);
+                                FileUtils.delete(new File(installPath, dir + "/minecraft/saves.ftbtmp"));
                             }
                         } catch (Exception e) {
                             Logger.logError("error restoring map", e);
@@ -309,7 +299,7 @@ public class ModManager extends JDialog {
     /**
      * Create the frame.
      */
-    public ModManager (JFrame owner, Boolean model) {
+    public ModManager(JFrame owner, Boolean model) {
         super(owner, model);
         setResizable(false);
         setTitle("Downloading...");
@@ -387,16 +377,16 @@ public class ModManager extends JDialog {
             if (backupCFG) {
                 File destination = new File(OSUtils.getCacheStorageLocation(), "backups" + sep + pack.getDir() + sep + "config_backup");
                 if (destination.exists()) {
-                    FTBFileUtils.delete(destination);
+                    FileUtils.delete(destination);
                 }
-                FTBFileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + sep + "minecraft" + sep + "config"), destination);
+                FileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + sep + "minecraft" + sep + "config"), destination);
             }
             if (backupSave) {
                 File destination = new File(OSUtils.getCacheStorageLocation(), "backups" + sep + pack.getDir() + sep + "saves_backup");
                 if (destination.exists()) {
-                    FTBFileUtils.delete(destination);
+                    FileUtils.delete(destination);
                 }
-                FTBFileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + sep + "minecraft" + sep + "saves"), destination);
+                FileUtils.copyFolder(new File(Settings.getSettings().getInstallPath(), pack.getDir() + sep + "minecraft" + sep + "saves"), destination);
             }
             curVersion = pack.getVersion().replace(".", "_");
             return false;
@@ -415,7 +405,7 @@ public class ModManager extends JDialog {
                     if (file.endsWith(".zip")) {
                         Logger.logDebug("retaining modpack file: " + tempFolder + File.separator + file);
                     } else {
-                        FTBFileUtils.delete(new File(tempFolder, file));
+                        FileUtils.delete(new File(tempFolder, file));
                     }
                 } catch (IOException e) {
                     Logger.logError(e.getMessage(), e);
@@ -441,10 +431,9 @@ public class ModManager extends JDialog {
                 }
                 if (file.toLowerCase().endsWith(".zip") || file.toLowerCase().endsWith(".jar") || file.toLowerCase().endsWith(".disabled") || file.toLowerCase().endsWith(".litemod")) {
                     try {
-                        boolean b = FTBFileUtils.delete(new File(folder, file));
-                        if (!b) {
+                        boolean b = FileUtils.delete(new File(folder, file));
+                        if (!b)
                             Logger.logInfo("Error deleting " + file);
-                        }
                     } catch (IOException e) {
                         Logger.logWarn(e.getMessage(), e);
 

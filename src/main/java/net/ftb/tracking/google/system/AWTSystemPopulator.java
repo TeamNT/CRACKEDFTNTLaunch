@@ -16,9 +16,12 @@
  */
 package net.ftb.tracking.google.system;
 
-import net.ftb.tracking.google.AnalyticsConfigData;
+import java.awt.DisplayMode;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 
-import java.awt.*;
+import net.ftb.tracking.google.AnalyticsConfigData;
 
 public class AWTSystemPopulator {
     public static final void populateConfigData (AnalyticsConfigData data) {
