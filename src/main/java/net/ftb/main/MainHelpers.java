@@ -23,20 +23,27 @@ import net.ftb.util.ErrorUtils;
 import net.ftb.util.OSUtils;
 import net.ftb.util.TrackerUtils;
 import net.ftb.util.winreg.JavaInfo;
+import net.ftb.util.winreg.JavaVersion;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 
-import javax.swing.JOptionPane;
+import javax.swing.*;
 
 public class MainHelpers {
-    public static void printInfo() {
+    public static void printInfo () {
         Logger.logInfo("FTBLaunch starting up (version " + Constants.version + " Build: " + Constants.buildNumber + ")");
-        Logger.logInfo("Java version: " + System.getProperty("java.version"));
-        Logger.logInfo("Java vendor: " + System.getProperty("java.vendor"));
-        Logger.logInfo("Java home: " + System.getProperty("java.home"));
-        Logger.logInfo("Java specification: " + System.getProperty("java.vm.specification.name") + " version: " + System.getProperty("java.vm.specification.version") + " by "
+        Logger.logDebug("System's default JVM: (This is not always used to launch MC)");
+        Logger.logDebug("Java version: " + System.getProperty("java.version"));
+        Logger.logDebug("Java vendor: " + System.getProperty("java.vendor"));
+        Logger.logDebug("Java home: " + System.getProperty("java.home"));
+        Logger.logDebug("Java specification: " + System.getProperty("java.vm.specification.name") + " version: " + System.getProperty("java.vm.specification.version") + " by "
                 + System.getProperty("java.vm.specification.vendor"));
-        Logger.logInfo("Java vm: " + System.getProperty("java.vm.name") + " version: " + System.getProperty("java.vm.version") + " by " + System.getProperty("java.vm.vendor"));
+        Logger.logDebug("Java vm: " + System.getProperty("java.vm.name") + " version: " + System.getProperty("java.vm.version") + " by " + System.getProperty("java.vm.vendor"));
         Logger.logInfo("OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version") + " (" + (OSUtils.is64BitOS() ? "64-bit" : "32-bit") + ")");
         Logger.logInfo("Launcher Install Dir: " + Settings.getSettings().getInstallPath());
         Logger.logInfo("System memory: " + OSUtils.getOSFreeMemory() + "M free, " + OSUtils.getOSTotalMemory() + "M total");
@@ -57,13 +64,14 @@ public class MainHelpers {
         }
 
         JavaInfo java = Settings.getSettings().getCurrentJava();
-        if(java.getMajor() < 1 || (java.getMajor() == 1 && java.getMinor() < 7)){
+        JavaVersion java7 = JavaVersion.createJavaVersion("1.7.0");
+        if (java.isOlder(java7)) {
             Logger.logError("Java 6 detected. Java 7 is recommended for most mod packs.");
         }
 
     }
 
-    public static void googleAnalytics() {
+    public static void googleAnalytics () {
         File credits = new File(OSUtils.getDynamicStorageLocation(), "credits.txt");
         try {
             if (!credits.exists()) {
@@ -100,7 +108,6 @@ public class MainHelpers {
                 TrackerUtils.sendPageView("net/ftb/gui/LaunchFrame.java", "Unique User (Credits)");
             }
 
-
         } catch (FileNotFoundException e1) {
             Logger.logError(e1.getMessage());
         } catch (IOException e1) {
@@ -115,7 +122,7 @@ public class MainHelpers {
 
         File stamp = new File(OSUtils.getDynamicStorageLocation(), "stamp");
         long unixTime = System.currentTimeMillis() / 1000L;
-        long unixts=0;
+        long unixts = 0;
         try {
             if (!stamp.exists()) {
                 FileOutputStream fos = new FileOutputStream(stamp);
@@ -160,7 +167,7 @@ public class MainHelpers {
         }
     }
 
-    public static void tossNag(String setting, String message) {
+    public static void tossNag (String setting, String message) {
         if (!Settings.getSettings().getBoolean(setting)) {
             int result = ErrorUtils.tossOKIgnoreDialog(message, JOptionPane.WARNING_MESSAGE);
             if (result != 0 && result != JOptionPane.CLOSED_OPTION) {

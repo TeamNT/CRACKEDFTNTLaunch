@@ -1,8 +1,8 @@
 /*
- * This file is part of FTNT Launcher.
+ * This file is part of FTB Launcher.
  *
- * Copyright © 2012-2014, FTNT Launcher Contributors <https://github.com/Slowpoke101/FTNTLaunch/>
- * FTNT Launcher is licensed under the Apache License, Version 2.0 (the "License");
+ * Copyright © 2012-2014, FTB Launcher Contributors <https://github.com/Slowpoke101/FTBLaunch/>
+ * FTB Launcher is licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -16,13 +16,12 @@
  */
 package net.ftb.util;
 
-import java.io.File;
-
 import net.ftb.data.Settings;
 import net.ftb.locale.I18N;
 import net.ftb.log.Logger;
-import net.ftb.util.OSUtils;
 import net.ftb.util.OSUtils.OS;
+
+import java.io.File;
 
 public class CheckInstallPath {
     public String installPath;
@@ -41,14 +40,14 @@ public class CheckInstallPath {
         OK, WARN, BLOCK,
     }
 
-    public CheckInstallPath(String path) {
+    public CheckInstallPath (String path) {
         this(path, false);
     }
 
-    public CheckInstallPath(String path, boolean calledFromLaunchFrame) {
+    public CheckInstallPath (String path, boolean calledFromLaunchFrame) {
         installPath = path;
         File f = new File(path);
-		String defaultLocation = "C:\\FTNT";
+        String defaultLocation = "C:\\FTB";
 
         /**
          *  Messages are shown by FirstRunDialog and by LaunchFrame
@@ -58,20 +57,8 @@ public class CheckInstallPath {
          *
          */
         String pathRegex = "[\\w:\\\\/ \\-\\.]+";
-        if (!path.matches(pathRegex)) {
-            String s = path.replaceAll(pathRegex, "");
-            setting = "CIP_badpath";
-            message = "Unsupported installation directory. Forge does not support following character(s): " + s + " Please select a new location such as "  + defaultLocation;
-            localizedMessage = I18N.getLocaleString("CIP_BADPATH").replace("LIST", s) + defaultLocation;
-            if (!Settings.getSettings().getBoolean(setting)) {
-                action = Action.BLOCK;
-                Logger.logError(message);
-            } else {
-                action = Action.OK;
-                Logger.logDebug("User has selected to ignore: \"" + message + "\"");
-            }
-        }
-        else if (OSUtils.getCurrentOS()==OS.WINDOWS && System.getenv("ProgramFiles")!=null && path.contains(System.getenv("ProgramFiles"))) {
+
+        if (OSUtils.getCurrentOS() == OS.WINDOWS && System.getenv("ProgramFiles") != null && path.contains(System.getenv("ProgramFiles"))) {
             setting = "CIP_programfiles";
             message = "Installing under C:\\Program Files\\ or similar is not supported. Please select a new location such as " + defaultLocation;
             localizedMessage = I18N.getLocaleString("CIP_PROGRAMFILES") + defaultLocation;
@@ -82,10 +69,21 @@ public class CheckInstallPath {
                 action = Action.OK;
                 Logger.logDebug("User has selected to ignore: \"" + message + "\"");
             }
-        }
-        else if (OSUtils.getCurrentOS()==OS.WINDOWS && path.contains("Content.IE5")) {
+        } else if (!path.matches(pathRegex)) {
+            String s = path.replaceAll(pathRegex, "");
+            setting = "CIP_badpath";
+            message = "Unsupported installation directory. Forge does not support following character(s): " + s + " Please select a new location such as " + defaultLocation;
+            localizedMessage = I18N.getLocaleString("CIP_BADPATH").replace("LIST", s) + defaultLocation;
+            if (!Settings.getSettings().getBoolean(setting)) {
+                action = Action.BLOCK;
+                Logger.logError(message);
+            } else {
+                action = Action.OK;
+                Logger.logDebug("User has selected to ignore: \"" + message + "\"");
+            }
+        } else if (OSUtils.getCurrentOS() == OS.WINDOWS && path.contains("Content.IE5")) {
             setting = "CIP_internetfiles";
-            message = "You cannot install FTNT to your Temporary Internet Files directory. Please select a new location such as " + defaultLocation;
+            message = "You cannot install FTB to your Temporary Internet Files directory. Please select a new location such as " + defaultLocation;
             localizedMessage = I18N.getLocaleString("CIP_INTERNETFILES") + defaultLocation;
             if (!Settings.getSettings().getBoolean(setting)) {
                 action = Action.BLOCK;
@@ -106,10 +104,9 @@ public class CheckInstallPath {
                 action = Action.OK;
                 Logger.logDebug("ignored: " + setting);
             }
-        }*/
-        else if (f.isDirectory() && !f.canWrite()) {
+        }*/ else if (f.isDirectory() && !f.canWrite()) {
             setting = "CIP_writeprotect";
-            message = "Could not write to the FTNT installation directory. Please select a folder which you have permission to write to.";
+            message = "Could not write to the FTB installation directory. Please select a folder which you have permission to write to.";
             localizedMessage = I18N.getLocaleString("CIP_WRITEPROTECT");
             if (!Settings.getSettings().getBoolean(setting)) {
                 action = Action.BLOCK;
@@ -122,7 +119,7 @@ public class CheckInstallPath {
         // special case. This must be ignored at InstallDirectoryDialog
         else if (calledFromLaunchFrame && !f.exists()) {
             setting = "CIP_exists";
-            message = "FTNT installation directory not found!";
+            message = "FTB installation directory not found!";
             localizedMessage = I18N.getLocaleString("CIP_EXISTS");
             if (!Settings.getSettings().getBoolean(setting)) {
                 action = Action.BLOCK;
@@ -131,12 +128,11 @@ public class CheckInstallPath {
                 action = Action.OK;
                 Logger.logDebug("User has selected to ignore: \"" + message + "\"");
             }
-        }
-        else if ( !calledFromLaunchFrame && !f.exists()) {
+        } else if (!calledFromLaunchFrame && !f.exists()) {
             f.mkdirs();
             if (!f.exists() || !f.canWrite()) {
                 setting = "CIP_create";
-                message = "Could not create FTNT installation location";
+                message = "Could not create FTB installation location";
                 localizedMessage = I18N.getLocaleString("CIP_CREATE");
                 if (!Settings.getSettings().getBoolean(setting)) {
                     action = Action.BLOCK;

@@ -16,32 +16,10 @@
  */
 package net.ftb.gui;
 
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTabbedPane;
-import javax.swing.SwingUtilities;
-import javax.swing.WindowConstants;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-
 import com.google.common.eventbus.Subscribe;
-
 import lombok.Getter;
 import lombok.Setter;
+import net.ftb.data.CommandLineSettings;
 import net.ftb.data.Constants;
 import net.ftb.data.LauncherStyle;
 import net.ftb.data.LoginResponse;
@@ -53,11 +31,18 @@ import net.ftb.download.Locations;
 import net.ftb.events.EnableObjectsEvent;
 import net.ftb.gui.dialogs.LoadingDialog;
 import net.ftb.gui.dialogs.ModPackVersionChangeDialog;
+import net.ftb.gui.dialogs.PasswordDialog;
+import net.ftb.gui.dialogs.PlayOfflineDialog;
 import net.ftb.gui.dialogs.ProfileAdderDialog;
 import net.ftb.gui.dialogs.ProfileEditorDialog;
-import net.ftb.gui.panes.*;
+import net.ftb.gui.panes.FTBPacksPane;
+import net.ftb.gui.panes.ILauncherPane;
+import net.ftb.gui.panes.MapUtils;
+import net.ftb.gui.panes.NewsPane;
+import net.ftb.gui.panes.OptionsPane;
+import net.ftb.gui.panes.TexturepackPane;
+import net.ftb.gui.panes.ThirdPartyPane;
 import net.ftb.locale.I18N;
-import net.ftb.locale.I18N.Locale;
 import net.ftb.log.Logger;
 import net.ftb.main.Main;
 import net.ftb.minecraft.MCInstaller;
@@ -65,10 +50,36 @@ import net.ftb.tools.MapManager;
 import net.ftb.tools.ModManager;
 import net.ftb.tools.ProcessMonitor;
 import net.ftb.tools.TextureManager;
-import net.ftb.util.*;
-import net.ftb.util.OSUtils.OS;
+import net.ftb.util.Benchmark;
+import net.ftb.util.DownloadUtils;
+import net.ftb.util.ErrorUtils;
+import net.ftb.util.FTBFileUtils;
+import net.ftb.util.OSUtils;
+import net.ftb.util.ObjectUtils;
+import net.ftb.util.TrackerUtils;
 import net.ftb.util.winreg.JavaInfo;
+import net.ftb.util.winreg.JavaVersion;
+import net.ftb.workers.LoginWorker;
+import net.ftb.workers.NewsWorker;
 import net.ftb.workers.UnreadNewsWorker;
+
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 @SuppressWarnings("serial")
 public class LaunchFrame extends JFrame {
@@ -81,19 +92,19 @@ public class LaunchFrame extends JFrame {
     private JLabel footerTUG = new JLabel(new ImageIcon(this.getClass().getResource(Locations.TUGLOGO)));
     private JLabel tpInstallLocLbl = new JLabel();
     @Getter
-    private final JButton launch = new JButton(), edit = new JButton(), donate = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
+    private final JButton launch = new JButton(), edit = new JButton(), serverbutton = new JButton(), mapInstall = new JButton(), serverMap = new JButton(),
             tpInstall = new JButton();
 
     private static String[] dropdown_ = { "Select Profile", "Create Profile" };
     private static JComboBox users, tpInstallLocation, mapInstallLocation;
+    private static AtomicInteger checkDoneLoadingCallCount = new AtomicInteger(0);
     /**
      * @return - Outputs LaunchFrame instance
      */
     @Getter
     @Setter
     private static LaunchFrame instance = null;
-    
-    public static boolean canUseAuthlib;
+
     public static int minUsable = -1;
     public final JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
@@ -102,7 +113,7 @@ public class LaunchFrame extends JFrame {
     public MapUtils mapsPane;
     public TexturepackPane tpPane;
     public OptionsPane optionsPane;
-    
+
     public static TrayMenu trayMenu;
 
     public static boolean allowVersionChange = false;
@@ -112,7 +123,6 @@ public class LaunchFrame extends JFrame {
     public static String tempPass = "";
     public static Panes currentPane = Panes.MODPACK;
     public static LoadingDialog loader;
-
 
     @Getter
     @Setter
@@ -127,33 +137,41 @@ public class LaunchFrame extends JFrame {
     /**
      * Create the frame.
      */
-    public LaunchFrame(final int tab) {
+    public LaunchFrame (final int tab) {
         setFont(new Font("a_FuturaOrto", Font.PLAIN, 12));
-        setResizable(false);
+        setResizable(true);
         setTitle(Constants.name + " v" + Constants.version);
         setIconImage(Toolkit.getDefaultToolkit().getImage(this.getClass().getResource("/image/logo_ftb.png")));
 
-        panel = new JPanel();
+        panel = new JPanel(new BorderLayout());
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        if (OSUtils.getCurrentOS() == OS.WINDOWS) {
-            setBounds(100, 100, 842, 480);
-        } else {
-            setBounds(100, 100, 850, 480);
-        }
-        panel.setBounds(0, 0, 850, 480);
-        panel.setLayout(null);
-        footer.setBounds(0, 380, 850, 100);
-        footer.setLayout(null);
+
+        int prefWidth = 850;
+        int prefHeight = 480;
+        this.setMinimumSize(new Dimension(prefWidth, prefHeight));
+
+        // Determine how much space is used by window decoration, resize accordingly
+        this.pack();
+        Dimension fullWindowSize = this.getContentPane().getSize();
+        this.setMinimumSize(new Dimension(prefWidth + (prefWidth - fullWindowSize.width), prefHeight + (prefHeight - fullWindowSize.height)));
+
+        // Center on screen
+        this.setLocationRelativeTo(null);
+
+        footer.setMinimumSize(new Dimension(850, 100));
+        footer.setLayout(new BorderLayout());
         footer.setBackground(LauncherStyle.getCurrentStyle().footerColor);
-        tabbedPane.setBounds(0, 0, 850, 380);
-        panel.add(tabbedPane);
-        panel.add(footer);
+
+        tabbedPane.setMinimumSize(new Dimension(850, 380));
+
+        panel.add(tabbedPane, BorderLayout.CENTER);
+        panel.add(footer, BorderLayout.PAGE_END);
         setContentPane(panel);
 
         //Footer
         footerLogo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerLogo.setBounds(20, 20, 42, 42);
+        footerLogo.setMinimumSize(new Dimension(42, 42));
         footerLogo.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked (MouseEvent event) {
@@ -161,8 +179,8 @@ public class LaunchFrame extends JFrame {
             }
         });
 
-        /*footerCreeper.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerCreeper.setBounds(72, 20, 132, 42);
+        footerCreeper.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        footerCreeper.setMinimumSize(new Dimension(132, 42));
         footerCreeper.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked (MouseEvent event) {
@@ -171,13 +189,13 @@ public class LaunchFrame extends JFrame {
         });
 
         footerTUG.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        footerTUG.setBounds(212, 20, 132, 42);
+        footerTUG.setMinimumSize(new Dimension(132, 42));
         footerTUG.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked (MouseEvent event) {
                 OSUtils.browse("http://feed-the-beast.com/tug");
             }
-        });*/
+        });
 
         dropdown_[0] = I18N.getLocaleString("PROFILE_SELECT");
         dropdown_[1] = I18N.getLocaleString("PROFILE_CREATE");
@@ -193,17 +211,8 @@ public class LaunchFrame extends JFrame {
             }
         }
 
-        donate.setText(I18N.getLocaleString("DONATE_BUTTON"));
-        donate.setBounds(390, 20, 80, 30);
-        donate.setEnabled(false);
-        donate.setToolTipText("Coming Soon...");
-        donate.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed (ActionEvent e) {
-            }
-        });
-
-        users.setBounds(550, 20, 150, 30);
+        users.setMinimumSize(new Dimension(150, 30));
+        users.setMaximumSize(new Dimension(150, 30));
         users.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent e) {
@@ -217,7 +226,7 @@ public class LaunchFrame extends JFrame {
         });
 
         edit.setText(I18N.getLocaleString("EDIT_BUTTON"));
-        edit.setBounds(480, 20, 60, 30);
+        edit.setMinimumSize(new Dimension(60, 30));
         edit.setVisible(true);
         edit.setEnabled(users.getSelectedIndex() > 1);
         edit.addActionListener(new ActionListener() {
@@ -233,8 +242,9 @@ public class LaunchFrame extends JFrame {
         });
 
         launch.setText(I18N.getLocaleString("LAUNCH_BUTTON"));
+        //TODO: move this or make sure doLaunch() enables it. Only visual bug.
         launch.setEnabled(false);
-        launch.setBounds(711, 20, 100, 30);
+        launch.setMinimumSize(new Dimension(100, 30));
         launch.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
@@ -242,7 +252,7 @@ public class LaunchFrame extends JFrame {
             }
         });
 
-        serverbutton.setBounds(480, 20, 330, 30);
+        serverbutton.setMinimumSize(new Dimension(330, 30));
         serverbutton.setText(I18N.getLocaleString("DOWNLOAD_SERVER_PACK"));
         serverbutton.setVisible(false);
         serverbutton.addActionListener(new ActionListener() {
@@ -251,7 +261,8 @@ public class LaunchFrame extends JFrame {
             public void actionPerformed (ActionEvent event) {
                 if (!ModPack.getSelectedPack().getServerUrl().isEmpty()) {
                     if (users.getSelectedIndex() > 1 && modPacksPane.packPanels.size() > 0) {
-                        String version = (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") || Settings.getSettings().getPackVer().equalsIgnoreCase("newest version")) ? ModPack
+                        String version = (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") || Settings.getSettings().getPackVer().equalsIgnoreCase("newest version"))
+                                ? ModPack
                                 .getSelectedPack().getVersion().replace(".", "_")
                                 : Settings.getSettings().getPackVer().replace(".", "_");
                         if (ModPack.getSelectedPack().isPrivatePack()) {
@@ -259,19 +270,20 @@ public class LaunchFrame extends JFrame {
                         } else {
                             OSUtils.browse(DownloadUtils.getCreeperhostLink("modpacks/" + ModPack.getSelectedPack().getDir() + "/" + version + "/" + ModPack.getSelectedPack().getServerUrl()));
                         }
-                        TrackerUtils.sendPageView(ModPack.getSelectedPack().getName() + "Server Download", "Server Download / " + ModPack.getSelectedPack().getName() + " / " + ModPack.getSelectedPack().getVersion());
+                        TrackerUtils.sendPageView(ModPack.getSelectedPack().getName() + "Server Download",
+                                "Server Download / " + ModPack.getSelectedPack().getName() + " / " + ModPack.getSelectedPack().getVersion());
                     }
                 }
             }
         });
 
-        mapInstall.setBounds(650, 20, 160, 30);
+        mapInstall.setMinimumSize(new Dimension(160, 30));
         mapInstall.setText(I18N.getLocaleString("INSTALL_MAP"));
         mapInstall.setVisible(false);
         mapInstall.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
-                if (mapsPane.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
+                if (MapUtils.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
                     MapManager man = new MapManager(new JFrame(), true);
                     man.setVisible(true);
                     MapManager.cleanUp();
@@ -280,30 +292,30 @@ public class LaunchFrame extends JFrame {
         });
 
         mapInstallLocation = new JComboBox();
-        mapInstallLocation.setBounds(480, 20, 160, 30);
+        mapInstallLocation.setMinimumSize(new Dimension(160, 30));
         mapInstallLocation.setToolTipText("Install to...");
         mapInstallLocation.setVisible(false);
 
-        serverMap.setBounds(480, 20, 330, 30);
+        serverMap.setMinimumSize(new Dimension(330, 30));
         serverMap.setText(I18N.getLocaleString("DOWNLOAD_MAP_SERVER"));
         serverMap.setVisible(false);
         serverMap.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent event) {
-                if (mapsPane.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
+                if (MapUtils.mapPanels.size() > 0 && getSelectedMapIndex() >= 0) {
                     OSUtils.browse(DownloadUtils.getCreeperhostLink("maps/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getMapName() + "/"
                             + Map.getMap(LaunchFrame.getSelectedMapIndex()).getVersion() + "/" + Map.getMap(LaunchFrame.getSelectedMapIndex()).getUrl()));
                 }
             }
         });
 
-        tpInstall.setBounds(650, 20, 160, 30);
+        tpInstall.setMinimumSize(new Dimension(160, 30));
         tpInstall.setText(I18N.getLocaleString("INSTALL_TEXTUREPACK"));
         tpInstall.setVisible(false);
         tpInstall.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed (ActionEvent arg0) {
-                if (tpPane.texturePackPanels.size() > 0 && getSelectedTexturePackIndex() >= 0) {
+                if (TexturepackPane.texturePackPanels.size() > 0 && getSelectedTexturePackIndex() >= 0) {
                     TextureManager man = new TextureManager(new JFrame(), true);
                     man.setVisible(true);
                 }
@@ -311,29 +323,58 @@ public class LaunchFrame extends JFrame {
         });
 
         tpInstallLocation = new JComboBox();
-        tpInstallLocation.setBounds(480, 20, 160, 30);
+        tpInstallLocation.setMinimumSize(new Dimension(160, 30));
         tpInstallLocation.setToolTipText("Install to...");
         tpInstallLocation.setVisible(false);
 
         tpInstallLocLbl.setText("Install to...");
-        tpInstallLocLbl.setBounds(480, 20, 80, 30);
+        tpInstallLocLbl.setMinimumSize(new Dimension(80, 30));
         tpInstallLocLbl.setVisible(false);
 
-        footer.add(edit);
-        footer.add(users);
-        footer.add(footerLogo);
-        footer.add(footerCreeper);
-        footer.add(footerTUG);
-        footer.add(launch);
-        footer.add(donate);
-        footer.add(serverbutton);
-        footer.add(mapInstall);
-        footer.add(mapInstallLocation);
-        footer.add(serverMap);
-        footer.add(tpInstall);
-        footer.add(tpInstallLocation);
+        // Panel for the items in the bottom left
+        JPanel logoPanel = new JPanel();
+        logoPanel.setBackground(LauncherStyle.getCurrentStyle().footerColor);
+        logoPanel.add(footerLogo);
+        logoPanel.add(footerCreeper);
+        logoPanel.add(footerTUG);
+
+        // Panel for the items in the bottom right
+        JPanel buttonFooterPanel = new JPanel();
+        buttonFooterPanel.setLayout(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        buttonFooterPanel.setBackground(LauncherStyle.getCurrentStyle().footerColor);
+        buttonFooterPanel.add(edit);
+        buttonFooterPanel.add(users);
+        buttonFooterPanel.add(launch);
+
+        // Buttons for texture pack pane
+        buttonFooterPanel.add(tpInstallLocation);
+        buttonFooterPanel.add(tpInstall);
+
+        // Buttons for custom map pane
+        buttonFooterPanel.add(mapInstallLocation);
+        buttonFooterPanel.add(mapInstall);
+
+        // Button if server map
+        buttonFooterPanel.add(serverMap);
+
+        footer.add(logoPanel, BorderLayout.LINE_START);
+        footer.add(buttonFooterPanel, BorderLayout.LINE_END);
 
         newsPane = new NewsPane();
+        NewsWorker nw = new NewsWorker() {
+            @Override
+            protected void done () {
+                String html = null;
+                try {
+                    html = get();
+                }
+                catch (InterruptedException e) { }
+                catch (ExecutionException e) { }
+
+                newsPane.setContent(html);
+            }
+        };
+        nw.execute();
         modPacksPane = new FTBPacksPane();
         thirdPartyPane = new ThirdPartyPane();
         mapsPane = new MapUtils();
@@ -348,6 +389,7 @@ public class LaunchFrame extends JFrame {
         tabbedPane.add(modPacksPane, 2);
         tabbedPane.add(thirdPartyPane, 3);
         tabbedPane.add(tpPane, 4);
+
         /*
          * TODO: This will block. Network.
          */
@@ -376,25 +418,44 @@ public class LaunchFrame extends JFrame {
             }
         });
         tabbedPane.setSelectedIndex(tab);
+
+        panel.addComponentListener(new ComponentAdapter() {
+            // Reset splitter on window resize to avoid being in an unreachable location
+            @Override
+            public void componentResized (ComponentEvent arg0) {
+                modPacksPane.getSplitPane().resetToPreferredSizes();
+                thirdPartyPane.getSplitPane().resetToPreferredSizes();
+                tpPane.getSplitPane().resetToPreferredSizes();
+                mapsPane.getSplitPane().resetToPreferredSizes();
+            }
+        });
+
     }
 
     public static void checkDoneLoading () {
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run () {
-                if (FTBPacksPane.getInstance().loaded) {
-                    LoadingDialog.setProgress(190);
-                    if (MapUtils.loaded) {
-                        LoadingDialog.setProgress(200);
-                        if (TexturepackPane.loaded) {
-                            loader.setVisible(false);
-                            instance.setVisible(true);
-                            instance.toFront();
-                            Benchmark.logBenchAs("main", "Launcher Startup");
-                        }
+        int callCount = checkDoneLoadingCallCount.incrementAndGet();
+        if (callCount == 1) {
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run () {
+                    LoadingDialog.advance("Opening main window");
+                    instance.setVisible(true);
+                    instance.toFront();
+                    //TODO: add checks if loader is disabled
+                    loader.setVisible(false);
+                    loader.dispose();
+                    Benchmark.logBenchAs("main", "Launcher Startup(main window opened and ready to use)");
+                    String packDir = CommandLineSettings.getSettings().getPackDir();
+                    if (packDir != null) {
+                        ModPack.setSelectedPack(packDir);
+                        LaunchFrame.getInstance().doLaunch();
                     }
                 }
-            }
-        });
+            });
+            Benchmark.logBenchAs("main", "Launcher Startup(Modpacks loaded)");
+        }
+        if (callCount == 2) {
+            Benchmark.logBenchAs("main", "Launcher Startup(maps and texturepacks loaded)");
+        }
     }
 
     public void setNewsIcon () {
@@ -429,7 +490,13 @@ public class LaunchFrame extends JFrame {
             ErrorUtils.tossError(ModPack.getSelectedPack().getDisclaimer());
         }
         if ((mojangData == null || mojangData.isEmpty()) && password.isEmpty()) {
-            password = "password";
+            PasswordDialog p = new PasswordDialog(this, true);
+            p.setVisible(true);
+            if (tempPass.isEmpty()) {
+                enableObjects();
+                return;
+            }
+            password = tempPass;
         }
 
         Logger.logInfo("Logging in...");
@@ -452,8 +519,53 @@ public class LaunchFrame extends JFrame {
         tpInstall.setEnabled(false);
         tpInstallLocation.setEnabled(false);
 
-        runGameUpdater(username);
-        enableObjects();
+        LoginWorker loginWorker = new LoginWorker(username, password, mojangData, selectedProfile) {
+            @Override
+            public void done () {
+                String responseStr;
+                try {
+                    responseStr = get();
+                } catch (InterruptedException err) {
+                    Logger.logError("User cancelled login process", err);
+                    enableObjects();
+                    return;
+                } catch (ExecutionException err) {
+                    // Worker should not leak ExecutionExceptions to caller: all Exceptions are handled internally twice
+                    if (err.getCause() instanceof IOException) {
+                        Logger.logError("Error while logging in", err);
+                        PlayOfflineDialog d = new PlayOfflineDialog("mcDown", username, UserManager.getUUID(username), getResp());
+                        d.setVisible(true);
+                    }
+                    enableObjects();
+                    return;
+                }
+
+                RESPONSE = getResp();
+                Logger.logDebug("responseStr: " + responseStr);
+                String uuid = UserManager.getUUID(username);
+                if (responseStr.equals("good")) {
+                    Logger.logInfo("Login complete.");
+                    try {
+                        // save userdata, including new mojangData
+                        Main.getUserManager().write();
+                        Logger.logDebug("user data saved");
+                    } catch (IOException e) {
+                        Logger.logError("logindata saving failed!");
+                    }
+                    runGameUpdater();
+                } else if (uuid != null && !uuid.isEmpty() && RESPONSE != null && responseStr.equals("offline")) {
+                    Logger.logDebug("Asking user for offline mode");
+                    PlayOfflineDialog d = new PlayOfflineDialog("mcDown", username, uuid, RESPONSE);
+                    d.setVisible(true);
+                } else {
+                    Logger.logDebug("Bad responseStr, not starting MC");
+                    enableObjects();
+                    return;
+                }//if user doesn't want offline mode
+                enableObjects();
+            }
+        };
+        loginWorker.execute();
     }
 
     private Boolean checkVersion (File verFile, ModPack pack) {
@@ -475,7 +587,7 @@ public class LaunchFrame extends JFrame {
     /**
      * checks whether an update is needed, and then starts the update process off
      */
-    private void runGameUpdater(String user) {
+    private void runGameUpdater () {
 
         final String installPath = Settings.getSettings().getInstallPath();
         final ModPack pack = ModPack.getSelectedPack();
@@ -520,9 +632,8 @@ public class LaunchFrame extends JFrame {
         if (pack.getMcVersion().startsWith("1.6") || pack.getMcVersion().startsWith("1.7") || pack.getMcVersion().startsWith("1.8") || pack.getMcVersion().startsWith("14w")) {
             isLegacy = false;
         }
-        MCInstaller.setupNewStyle(installPath, pack, isLegacy, user);
+        MCInstaller.setupNewStyle(installPath, pack, isLegacy, RESPONSE);
     }
-
 
     /**
      * "Saves" the settings from the GUI controls into the settings class.
@@ -559,12 +670,12 @@ public class LaunchFrame extends JFrame {
         tpInstallLocation.removeAllItems();
         for (String location : locations) {
             if (location != null && !location.isEmpty()) {
-                tpInstallLocation.addItem(ModPack.getPack(location.trim()).getName());
+                tpInstallLocation.addItem(ModPack.getPack(location.trim()).getNameWithVersion());
             }
         }
         //TODO:
         // Decide later if we want to do this? How to handle selection from two modpack panes?
-        tpInstallLocation.setSelectedItem(ModPack.getSelectedPack(true).getName());
+        tpInstallLocation.setSelectedItem(ModPack.getSelectedPack(true).getNameWithVersion());
     }
 
     /**
@@ -584,14 +695,14 @@ public class LaunchFrame extends JFrame {
      * @return - Outputs selected map index
      */
     public static int getSelectedMapIndex () {
-        return instance.mapsPane.getSelectedMapIndex();
+        return MapUtils.getSelectedMapIndex();
     }
 
     /**
      * @return - Outputs selected texturepack index
      */
     public static int getSelectedTexturePackIndex () {
-        return instance.tpPane.getSelectedTexturePackIndex();
+        return TexturepackPane.getSelectedTexturePackIndex();
     }
 
     /**
@@ -630,10 +741,12 @@ public class LaunchFrame extends JFrame {
         tpInstallLocation.setEnabled(true);
         TextureManager.updating = false;
     }
+
     @Subscribe
-    private void handleEnableObjectsEvent(EnableObjectsEvent e){
+    private void handleEnableObjectsEvent (EnableObjectsEvent e) {
         enableObjects();
     }
+
     /**
      * Download and install mods
      * @return boolean - represents whether it was successful in initializing mods
@@ -645,17 +758,18 @@ public class LaunchFrame extends JFrame {
         man.setVisible(true);
         while (man == null) {
         }
-        while (!man.worker.isDone()) {
+        while (!ModManager.worker.isDone()) {
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException ignored) { }
+            } catch (InterruptedException ignored) {
+            }
         }
-        if (man.erroneous) {
+        if (ModManager.erroneous) {
             return false;
         }
         try {
             MCInstaller.installMods(ModPack.getSelectedPack().getDir());
-            man.cleanUp();
+            ModManager.cleanUp();
         } catch (IOException e) {
             Logger.logDebug("Exception: ", e);
         }
@@ -702,7 +816,7 @@ public class LaunchFrame extends JFrame {
                 disableMainButtons();
                 disableMapButtons();
             } else {
-                result = mapsPane.type.equals("Server");
+                result = MapUtils.type.equals("Server");
                 mapInstall.setVisible(!result);
                 mapInstallLocation.setVisible(!result);
                 serverMap.setVisible(result);
@@ -724,34 +838,17 @@ public class LaunchFrame extends JFrame {
     }
 
     // TODO: Make buttons dynamically sized.
+
     /**
      * updates the buttons/text to language specific
      */
     public void updateLocale () {
-        if (I18N.currentLocale == Locale.deDE) {
-            edit.setBounds(420, 20, 120, 30);
-            donate.setBounds(330, 20, 80, 30);
-            mapInstall.setBounds(620, 20, 190, 30);
-            mapInstallLocation.setBounds(420, 20, 190, 30);
-            serverbutton.setBounds(420, 20, 390, 30);
-            tpInstallLocation.setBounds(420, 20, 190, 30);
-            tpInstall.setBounds(620, 20, 190, 30);
-        } else {
-            edit.setBounds(480, 20, 60, 30);
-            donate.setBounds(390, 20, 80, 30);
-            mapInstall.setBounds(650, 20, 160, 30);
-            mapInstallLocation.setBounds(480, 20, 160, 30);
-            serverbutton.setBounds(480, 20, 330, 30);
-            tpInstallLocation.setBounds(480, 20, 160, 30);
-            tpInstall.setBounds(650, 20, 160, 30);
-        }
         launch.setText(I18N.getLocaleString("LAUNCH_BUTTON"));
         edit.setText(I18N.getLocaleString("EDIT_BUTTON"));
         serverbutton.setText(I18N.getLocaleString("DOWNLOAD_SERVER_PACK"));
         mapInstall.setText(I18N.getLocaleString("INSTALL_MAP"));
         serverMap.setText(I18N.getLocaleString("DOWNLOAD_MAP_SERVER"));
         tpInstall.setText(I18N.getLocaleString("INSTALL_TEXTUREPACK"));
-        donate.setText(I18N.getLocaleString("DONATE_BUTTON"));
         dropdown_[0] = I18N.getLocaleString("PROFILE_SELECT");
         dropdown_[1] = I18N.getLocaleString("PROFILE_CREATE");
         optionsPane.updateLocale();
@@ -759,30 +856,43 @@ public class LaunchFrame extends JFrame {
         thirdPartyPane.updateLocale();
         mapsPane.updateLocale();
         tpPane.updateLocale();
-        if(trayMenu != null) {
-        	trayMenu.updateLocale();
+        if (trayMenu != null) {
+            trayMenu.updateLocale();
         }
     }
 
     public void doLaunch () {
         JavaInfo java = Settings.getSettings().getCurrentJava();
-        int[] minSup = ModPack.getSelectedPack().getMinJRE();
-        if (ModPack.getSelectedPack().getMinLaunchSpec() <= Constants.buildNumber) {
-            if (users.getSelectedIndex() > 1 && ModPack.getSelectedPack() != null) {
-                if (minSup.length >= 2 && minSup[0] <= java.getMajor() && minSup[1] <= java.getMinor()) {
-                    Settings.getSettings().setLastFTBPack(ModPack.getSelectedPack(true).getDir());
-                    Settings.getSettings().setLastThirdPartyPack(ModPack.getSelectedPack(false).getDir());
-                    saveSettings();
-                    doLogin(UserManager.getUsername(users.getSelectedItem().toString()), UserManager.getPassword(users.getSelectedItem().toString()),
-                            UserManager.getMojangData(users.getSelectedItem().toString()), UserManager.getName(users.getSelectedItem().toString()));
-                } else {//user can't run pack-- JRE not high enough
-                    ErrorUtils.tossError("You must use at least java " + minSup[0] + "." + minSup[1] + " to play this pack! Please go to Options to get a link or Advanced Options enter a path.", java.toString());
-                }
-            } else if (users.getSelectedIndex() <= 1) {
-                ErrorUtils.tossError("Please select a profile!");
-            }
-        } else {
+        ModPack pack = ModPack.getSelectedPack();
+        // check launcher version
+        if (ModPack.getSelectedPack().getMinLaunchSpec() > Constants.buildNumber) {
             ErrorUtils.tossError("Please update your launcher in order to launch this pack! This can be done by restarting your launcher, an update dialog will pop up.");
+            return;
+        }
+
+        // check if user profile is selected
+        if (users.getSelectedIndex() <= 1) {
+            if (UserManager._users.size() == 0) {
+                ProfileAdderDialog p = new ProfileAdderDialog(getInstance(), true);
+                p.setVisible(true);
+            } else {
+                ErrorUtils.tossError("Please select a profile!");
+                return;
+            }
+        }
+
+        // check selected java is at least version specified in pack's XML
+        JavaVersion minSup = JavaVersion.createJavaVersion(pack.getMinJRE());
+        if (minSup.isOlder(java) || minSup.isSameVersion(java)) {
+            Settings.getSettings().setLastFTBPack(ModPack.getSelectedPack(true).getDir());
+            Settings.getSettings().setLastThirdPartyPack(ModPack.getSelectedPack(false).getDir());
+            saveSettings();
+            doLogin(UserManager.getUsername(users.getSelectedItem().toString()), UserManager.getPassword(users.getSelectedItem().toString()),
+                    UserManager.getMojangData(users.getSelectedItem().toString()), UserManager.getName(users.getSelectedItem().toString()));
+        } else {//user can't run pack-- JRE not high enough
+            ErrorUtils.tossError("You must use at least java " + pack.getMinJRE() + " to play this pack! Please go to Options to get a link or Advanced Options enter a path.",
+                    java.toString());
+            return;
         }
     }
 
@@ -804,23 +914,24 @@ public class LaunchFrame extends JFrame {
         }
     }
 
-    public static void setUpSystemTray() {
-    	trayMenu = new TrayMenu();
-    	
-    	SystemTray tray = SystemTray.getSystemTray();
-    	TrayIcon trayIcon = new TrayIcon(Toolkit.getDefaultToolkit().getImage(instance.getClass().getResource("/image/logo_ftb.png")));
-    	
-    	trayIcon.setPopupMenu(trayMenu);
-    	trayIcon.setToolTip(Constants.name);
-    	trayIcon.setImageAutoSize(true);
-    	
-    	try {
-			tray.add(trayIcon);
-		} catch (AWTException e) {
-			e.printStackTrace();
-		}
+    public static void setUpSystemTray () {
+        trayMenu = new TrayMenu();
+
+        SystemTray tray = SystemTray.getSystemTray();
+        TrayIcon trayIcon = new TrayIcon(Toolkit.getDefaultToolkit().getImage(instance.getClass().getResource("/image/logo_ftb.png")));
+
+        trayIcon.setPopupMenu(trayMenu);
+        trayIcon.setToolTip(Constants.name);
+        trayIcon.setImageAutoSize(true);
+
+        try {
+            tray.add(trayIcon);
+        } catch (AWTException e) {
+            e.printStackTrace();
+        }
     }
-    public static void main(String args[]) {
+
+    public static void main (String args[]) {
         Main.main(args);// just in case someone is launching w/ this as the main class
     }
 }

@@ -16,29 +16,41 @@
  */
 package net.ftb.minecraft;
 
-import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.Map.Entry;
-
-
 import com.google.common.collect.Lists;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
+import com.mojang.authlib.UserAuthentication;
+import com.mojang.authlib.UserType;
+import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
+import com.mojang.util.UUIDTypeAdapter;
 import net.feed_the_beast.launcher.json.JsonFactory;
+import net.feed_the_beast.launcher.json.OldPropertyMapSerializer;
 import net.feed_the_beast.launcher.json.assets.AssetIndex;
 import net.feed_the_beast.launcher.json.assets.AssetIndex.Asset;
 import net.ftb.data.ModPack;
 import net.ftb.data.Settings;
 import net.ftb.download.Locations;
 import net.ftb.log.Logger;
-import net.ftb.util.*;
+import net.ftb.util.Benchmark;
+import net.ftb.util.DownloadUtils;
+import net.ftb.util.ErrorUtils;
+import net.ftb.util.FTBFileUtils;
+import net.ftb.util.OSUtils;
+import net.ftb.util.Parallel;
+import net.ftb.util.TrackerUtils;
 
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
-import com.mojang.authlib.UserType;
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.*;
 
@@ -48,9 +60,9 @@ public class MCLauncher {
     private static String gameDirectory;
     private static StringBuilder cpb;
 
-    public static Process launchMinecraft(String javaPath, String gameFolder, File assetDir, File nativesDir, List<File> classpath, String mainClass, String args, String assetIndex, String rmax, String maxPermSize, String version, boolean legacy, String user)
-    	    throws IOException
-    	  {
+    public static Process launchMinecraft (String javaPath, String gameFolder, File assetDir, File nativesDir, List<File> classpath, String mainClass, String args, String assetIndex, String rmax,
+            String maxPermSize, String version, UserAuthentication authentication, boolean legacy) throws IOException {
+
         cpb = new StringBuilder("");
         isLegacy = legacy;
         gameDirectory = gameFolder;
@@ -61,8 +73,9 @@ public class MCLauncher {
             cpb.append(OSUtils.getJavaDelimiter());
             cpb.append(f.getAbsolutePath());
         }
-        if(isLegacy)
+        if (isLegacy) {
             setupLegacyStuff(gameDirectory, Locations.FORGENAME);
+        }
         //Logger.logInfo("ClassPath: " + cpb.toString());
 
         List<String> arguments = Lists.newArrayList();
@@ -99,10 +112,14 @@ public class MCLauncher {
         arguments.add("-Dnet.java.games.input.librarypath=" + nativesDir.getAbsolutePath());
         arguments.add("-Duser.home=" + gameDir.getParentFile().getAbsolutePath());
 
+        if (OSUtils.getCurrentOS() == OSUtils.OS.WINDOWS) {
+            arguments.add("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump");
+        }
+
         // Use IPv4 when possible, only use IPv6 when connecting to IPv6 only addresses
         arguments.add("-Djava.net.preferIPv4Stack=true");
 
-        if(Settings.getSettings().getUseSystemProxy()) {
+        if (Settings.getSettings().getUseSystemProxy()) {
             arguments.add("-Djava.net.useSystemProxies=true");
         }
 
@@ -112,8 +129,11 @@ public class MCLauncher {
         String additionalOptions = Settings.getSettings().getAdditionalJavaOptions();
         if (!additionalOptions.isEmpty()) {
             Logger.logInfo("Additional java parameters: " + additionalOptions);
-            for(String s : additionalOptions.split("\\s+")) {
-                if(s.equalsIgnoreCase("-Dfml.ignoreInvalidMinecraftCertificates=true")&& ! isLegacy) {
+            for (String s : additionalOptions.split("\\s+")) {
+                if (s.equalsIgnoreCase("-Dfml.ignoreInvalidMinecraftCertificates=true") && !isLegacy) {
+                    String curVersion = (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") ? ModPack.getSelectedPack().getVersion() :
+                            Settings.getSettings().getPackVer()).replace(".", "_");
+                    TrackerUtils.sendPageView("JarmodAttempt", "JarmodAttempt / " + ModPack.getSelectedPack().getName() + " / " + curVersion.replace('_', '.'));
                     ErrorUtils.tossError("JARMODDING DETECTED in 1.6.4+ " + s, "FTB Does not support jarmodding in MC 1.6+ ");
                 } else {
                     arguments.add(s);
@@ -143,33 +163,63 @@ public class MCLauncher {
 
         arguments.add(mainClass);
         for (String s : args.split(" ")) {
-          if (s.equals("${auth_player_name}")) {
-            arguments.add(user);
-          } else if (s.equals("${auth_uuid}")) {
-            arguments.add(new UUID(0L, 0L).toString());
-          } else if (s.equals("${user_type}")) {
-            arguments.add(UserType.LEGACY.getName());
-          } else if (s.equals("${user_properties}")) {
-            arguments.add("{}");
-          } else if (s.equals("${auth_session}")) {
-            arguments.add("-");
-          } else if (s.equals("${auth_access_token}")) {
-            arguments.add("f5aaf72f76684c5fb88a07d4f2221fba");
-          } else if (s.equals("${version_name}")) {
-            arguments.add(version);
-          } else if (s.equals("${game_directory}")) {
-            arguments.add(gameDir.getAbsolutePath());
-          } else if ((s.equals("${game_assets}")) || (s.equals("${assets_root}"))) {
-            arguments.add(assetDir.getAbsolutePath());
-          } else if (s.equals("${assets_index_name}")) {
-            arguments.add(assetIndex == null ? "legacy" : assetIndex);
-          } else if (isLegacy) {
-            arguments.add(parseLegacyArgs(s));
-          } else {
-            arguments.add(s);
-          }
+            boolean done = false;
+            if (authentication.getSelectedProfile() != null) {
+                if (s.equals("${auth_player_name}")) {
+                    arguments.add(authentication.getSelectedProfile().getName());
+                    done = true;
+                } else if (s.equals("${auth_uuid}")) {
+                    arguments.add(UUIDTypeAdapter.fromUUID(authentication.getSelectedProfile().getId()));
+                    done = true;
+                } else if (s.equals("${user_type}")) {
+                    arguments.add(authentication.getUserType().getName());
+                    done = true;
+                }
+            } else {
+                if (s.equals("${auth_player_name}")) {
+                    arguments.add("Player");
+                    done = true;
+                } else if (s.equals("${auth_uuid}")) {
+                    arguments.add(new UUID(0L, 0L).toString());
+                    done = true;
+                } else if (s.equals("${user_type}")) {
+                    arguments.add(UserType.LEGACY.getName());
+                    done = true;
+                }
+            }
+            if (!done) {
+                if (s.equals("${auth_session}")) {
+                    if (authentication.isLoggedIn() && authentication.canPlayOnline()) {
+                        if (authentication instanceof YggdrasilUserAuthentication && !isLegacy) {
+                            arguments.add(String.format("token:%s:%s", authentication.getAuthenticatedToken(), UUIDTypeAdapter.fromUUID(authentication.getSelectedProfile().getId())));
+                        } else {
+                            arguments.add(authentication.getAuthenticatedToken());
+                        }
+                    } else {
+                        arguments.add("-");
+                    }
+                } else if (s.equals("${auth_access_token}")) {
+                    arguments.add(authentication.getAuthenticatedToken());
+                } else if (s.equals("${version_name}")) {
+                    arguments.add(version);
+                } else if (s.equals("${game_directory}")) {
+                    arguments.add(gameDir.getAbsolutePath());
+                } else if (s.equals("${game_assets}") || s.equals("${assets_root}")) {
+                    arguments.add(assetDir.getAbsolutePath());
+                } else if (s.equals("${assets_index_name}")) {
+                    arguments.add(assetIndex == null ? "legacy" : assetIndex);
+                } else if (s.equals("${user_properties}")) {
+                    arguments.add(new GsonBuilder().registerTypeAdapter(PropertyMap.class, new OldPropertyMapSerializer()).create().toJson(authentication.getUserProperties()));
+                } else if (s.equals("${user_properties_map}")) {
+                    arguments.add(new GsonBuilder().registerTypeAdapter(PropertyMap.class, new PropertyMap.Serializer()).create().toJson(authentication.getUserProperties()));
+                } else if (isLegacy) {
+                    arguments.add(parseLegacyArgs(s));
+                } else {
+                    arguments.add(s);
+                }
+            }
         }
-        if(!isLegacy) {//legacy is handled separately
+        if (!isLegacy) {//legacy is handled separately
             boolean fullscreen = false;
             if (Settings.getSettings().getLastExtendedState() == JFrame.MAXIMIZED_BOTH) {
                 GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -183,14 +233,13 @@ public class MCLauncher {
             Dimension def = new Dimension(854, 480);
             if (Settings.getSettings().getLastDimension().getWidth() != def.getWidth() && !fullscreen) {
                 arguments.add("--width");
-                arguments.add(String.valueOf((int) Settings.getSettings().getLastDimension().getWidth()));
+                arguments.add(String.valueOf(Math.abs((int) Settings.getSettings().getLastDimension().getWidth())));
             }
             if (Settings.getSettings().getLastDimension().getHeight() != def.getHeight() && !fullscreen) {
                 arguments.add("--height");
-                arguments.add(String.valueOf((int) Settings.getSettings().getLastDimension().getHeight()));
+                arguments.add(String.valueOf(Math.abs((int) Settings.getSettings().getLastDimension().getHeight())));
             }
         }
-
 
         ProcessBuilder builder = new ProcessBuilder(arguments);
         /*StringBuilder tmp = new StringBuilder();
@@ -203,7 +252,7 @@ public class MCLauncher {
         return builder.start();
     }
 
-    private static void setMemory(List<String> arguments, String rmax) {
+    private static void setMemory (List<String> arguments, String rmax) {
         boolean memorySet = false;
         try {
             int min = 256;
@@ -225,13 +274,14 @@ public class MCLauncher {
         }
     }
 
-    private static File syncAssets(File assetDir, String indexName) throws JsonSyntaxException, JsonIOException, IOException {
+    private static File syncAssets (File assetDir, String indexName) throws JsonSyntaxException, JsonIOException, IOException {
         Logger.logInfo("Syncing Assets:");
         final File objects = new File(assetDir, "objects");
         AssetIndex index = JsonFactory.loadAssetIndex(new File(assetDir, "indexes/{INDEX}.json".replace("{INDEX}", indexName)));
 
-        if (!index.virtual)
+        if (!index.virtual) {
             return assetDir;
+        }
 
         final File targetDir = new File(assetDir, "virtual/" + indexName);
 
@@ -240,30 +290,30 @@ public class MCLauncher {
 
         Benchmark.reset("threading");
         Parallel.TaskHandler th = new Parallel.ForEach(index.objects.entrySet())
-            .withFixedThreads(2*OSUtils.getNumCores())
-            //.configurePoolSize(2*2*OSUtils.getNumCores(), 10)
-            .apply( new Parallel.F<Entry<String, Asset>, Void>() {
-                public Void apply(Entry<String, Asset> e) {
-                    Asset asset = e.getValue();
-                    File local = new File(targetDir, e.getKey());
-                    File object = new File(objects, asset.hash.substring(0, 2) + "/" + asset.hash);
+                .withFixedThreads(2 * OSUtils.getNumCores())
+                        //.configurePoolSize(2*2*OSUtils.getNumCores(), 10)
+                .apply(new Parallel.F<Entry<String, Asset>, Void>() {
+                    public Void apply (Entry<String, Asset> e) {
+                        Asset asset = e.getValue();
+                        File local = new File(targetDir, e.getKey());
+                        File object = new File(objects, asset.hash.substring(0, 2) + "/" + asset.hash);
 
-                    old.remove(local);
+                        old.remove(local);
 
-                    try {
-                        if (local.exists() && !DownloadUtils.fileSHA(local).equals(asset.hash)) {
-                            Logger.logInfo("  Changed: " + e.getKey());
-                            FTBFileUtils.copyFile(object, local, true);
-                        } else if (!local.exists()) {
-                            Logger.logInfo("  Added: " + e.getKey());
-                            FTBFileUtils.copyFile(object, local);
-                        }
+                        try {
+                            if (local.exists() && !DownloadUtils.fileSHA(local).equals(asset.hash)) {
+                                Logger.logInfo("  Changed: " + e.getKey());
+                                FTBFileUtils.copyFile(object, local, true);
+                            } else if (!local.exists()) {
+                                Logger.logInfo("  Added: " + e.getKey());
+                                FTBFileUtils.copyFile(object, local);
+                            }
                         } catch (Exception ex) {
-                        Logger.logError("Asset checking failed: ", ex);
+                            Logger.logError("Asset checking failed: ", ex);
+                        }
+                        return null;
                     }
-                    return null;
-                }
-            });
+                });
         try {
             th.shutdown();
             th.wait(60, TimeUnit.SECONDS);
@@ -281,30 +331,31 @@ public class MCLauncher {
         return targetDir;
     }
 
-    public static String parseLegacyArgs(String s) {
-        if (s.equals("${animation_name}"))
+    public static String parseLegacyArgs (String s) {
+        if (s.equals("${animation_name}")) {
             return (((!ModPack.getSelectedPack().getAnimation().equalsIgnoreCase("empty")) ? OSUtils.getCacheStorageLocation() + "ModPacks" + separator + ModPack.getSelectedPack().getDir()
                     + separator + ModPack.getSelectedPack().getAnimation() : "empty"));
-        else if (s.equals("${forge_name}"))
+        } else if (s.equals("${forge_name}")) {
             return Locations.FORGENAME;
-        else if (s.equals("${pack_name}"))
+        } else if (s.equals("${pack_name}")) {
             return (ModPack.getSelectedPack().getName() + " v"
-                    + (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") ? ModPack.getSelectedPack().getVersion() : Settings.getSettings().getPackVer()));
-        else if (s.equals("${pack_image}"))
+                            + (Settings.getSettings().getPackVer().equalsIgnoreCase("recommended version") ? ModPack.getSelectedPack().getVersion() : Settings.getSettings().getPackVer()));
+        } else if (s.equals("${pack_image}")) {
             return (OSUtils.getCacheStorageLocation() + "ModPacks" + separator + ModPack.getSelectedPack().getDir() + separator + ModPack.getSelectedPack().getLogoName());
-        else if (s.equals("${extended_state}"))
+        } else if (s.equals("${extended_state}")) {
             return (String.valueOf(Settings.getSettings().getLastExtendedState()));
-        else if (s.equals("${width}"))
+        } else if (s.equals("${width}")) {
             return (String.valueOf(Settings.getSettings().getLastDimension().getWidth()));
-        else if (s.equals("${height}"))
+        } else if (s.equals("${height}")) {
             return (String.valueOf(Settings.getSettings().getLastDimension().getHeight()));
-        else if (s.equals("${minecraft_jar}"))
+        } else if (s.equals("${minecraft_jar}")) {
             return (gameDirectory + File.separator + "bin" + File.separator + Locations.OLDMCJARNAME);
-        else
+        } else {
             return s;
+        }
     }
 
-    public static void setupLegacyStuff(String workingDir, String forgename){
+    public static void setupLegacyStuff (String workingDir, String forgename) {
         File instModsDir = new File(new File(workingDir).getParentFile(), "instMods/");
         //jarmods are added inside the wrapper
 

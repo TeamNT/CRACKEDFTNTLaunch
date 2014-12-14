@@ -16,6 +16,13 @@
  */
 package net.ftb.util;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import net.ftb.data.ModPack;
+import net.ftb.data.Settings;
+import net.ftb.log.Logger;
+import org.apache.commons.io.FileUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,13 +38,6 @@ import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-import net.ftb.data.ModPack;
-import net.ftb.data.Settings;
-import net.ftb.log.Logger;
-import org.apache.commons.io.FileUtils;
 
 public class FTBFileUtils {
     /**
@@ -79,8 +79,9 @@ public class FTBFileUtils {
             if (!destinationFile.exists()) {
                 destinationFile.getParentFile().mkdirs();
                 destinationFile.createNewFile();
-            } else if (!overwrite)
+            } else if (!overwrite) {
                 return;
+            }
             FileChannel sourceStream = null, destinationStream = null;
             try {
                 sourceStream = new FileInputStream(sourceFile).getChannel();
@@ -117,7 +118,9 @@ public class FTBFileUtils {
      * @param zipLocation - the location of the zip to be extracted
      * @param outputLocation - location to extract to
      */
-    public static void extractZipTo (String zipLocation, String outputLocation) {
+    public static boolean extractZipTo (String zipLocation, String outputLocation) {
+        boolean success = true;
+        boolean backupSuccess = true;
         ZipInputStream zipinputstream = null;
         try {
             byte[] buf = new byte[1024];
@@ -138,17 +141,23 @@ public class FTBFileUtils {
                 zipentry = zipinputstream.getNextEntry();
             }
         } catch (Exception e) {
+            success = false;
             Logger.logError("Error while extracting zip", e);
-            backupExtract(zipLocation, outputLocation);
+            backupSuccess = backupExtract(zipLocation, outputLocation);
         } finally {
             try {
                 zipinputstream.close();
             } catch (IOException e) {
             }
         }
+        if (!success) {
+            return backupSuccess;
+        }
+        return true;
     }
 
-    public static void backupExtract (String zipLocation, String outputLocation) {
+    public static boolean backupExtract (String zipLocation, String outputLocation) {
+        boolean success = true;
         Logger.logInfo("Extracting (Backup way)");
         byte[] buffer = new byte[1024];
         ZipInputStream zis = null;
@@ -176,6 +185,7 @@ public class FTBFileUtils {
             }
         } catch (IOException ex) {
             Logger.logError("Error while extracting zip", ex);
+            success = false;
         } finally {
             try {
                 zis.closeEntry();
@@ -183,6 +193,7 @@ public class FTBFileUtils {
             } catch (IOException e) {
             }
         }
+        return success;
     }
 
     /**
@@ -226,8 +237,9 @@ public class FTBFileUtils {
 
     public static List<File> listDirs (File path) {
         List<File> ret = Lists.newArrayList();
-        if (path.exists())
+        if (path.exists()) {
             listDirs(path, ret);
+        }
         Collections.sort(ret, new Comparator<File>() {
             @Override
             public int compare (File o1, File o2) {
@@ -256,19 +268,20 @@ public class FTBFileUtils {
 
     private static void listFiles (File path, Set<File> set) {
         for (File f : path.listFiles()) {
-            if (f.isDirectory())
+            if (f.isDirectory()) {
                 listFiles(f, set);
-            else
+            } else {
                 set.add(f);
+            }
         }
     }
-    
-    public static void move(File oldFile, File newFile) {
+
+    public static void move (File oldFile, File newFile) {
         try {
-            if(oldFile.exists() && !newFile.exists()) {
+            if (oldFile.exists() && !newFile.exists()) {
                 FileUtils.moveFile(oldFile, newFile);
             }
-        } catch(IOException e) {
+        } catch (IOException e) {
             Logger.logWarn("Exception occurred while moving " + oldFile.toString() + " : " + e.getMessage());
         }
     }
